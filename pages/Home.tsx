@@ -202,7 +202,7 @@ const Home = () => {
         )}
 
         {/* Actions */}
-        <div className={`px-4 flex gap-3 items-center ${isHeirloom ? 'mb-2' : 'py-4'}`}>
+        <div className={`px-4 lg:px-8 flex gap-3 items-center ${isHeirloom ? 'mb-2' : 'py-4'}`}>
             {/* Theme Cycle Button */}
             {!isHeirloom && (
                 <button 
@@ -295,7 +295,7 @@ const Home = () => {
 
         {/* Tab Switcher (Non-Heirloom) */}
         {!isHeirloom && (
-            <div className={`flex px-4 ${isRetro ? '' : 'border-b'} ${isMidnight ? 'border-gray-800' : 'border-gray-100'}`}>
+            <div className={`flex px-4 lg:px-8 ${isRetro ? '' : 'border-b'} ${isMidnight ? 'border-gray-800' : 'border-gray-100'}`}>
                 <button 
                 onClick={() => setActiveTab('nearby')}
                 className={`pb-3 text-sm font-bold border-b-2 mr-6 transition-colors 
@@ -323,8 +323,8 @@ const Home = () => {
       {/* --- HEIRLOOM HERO SECTION --- */}
       {isHeirloom && (
           <>
-            <div className="px-4 py-2">
-               <div className="relative rounded-[2rem] overflow-hidden h-48 bg-[#E3D5CA]">
+            <div className="px-4 lg:px-8 py-2">
+               <div className="relative rounded-[2rem] overflow-hidden h-48 lg:h-64 bg-[#E3D5CA]">
                   <img src="https://images.unsplash.com/photo-1544126566-4751433f52aa?auto=format&fit=crop&q=80&w=800" className="w-full h-full object-cover opacity-90 mix-blend-multiply" />
                   <div className="absolute inset-0 bg-gradient-to-r from-[#F9F6F0]/90 to-transparent p-6 flex flex-col justify-center max-w-[70%]">
                      <h2 className="font-serif text-3xl text-[#2F3E2E] leading-none mb-2">Discover<br/>Pre-Loved<br/>Treasures</h2>
@@ -334,8 +334,8 @@ const Home = () => {
             </div>
 
             {/* Categories Scroll */}
-            <div className="px-4 py-6 overflow-x-auto no-scrollbar">
-               <div className="flex gap-6 justify-between min-w-max px-2">
+            <div className="px-4 lg:px-8 py-6 overflow-x-auto no-scrollbar">
+               <div className="flex gap-6 lg:gap-8 justify-start lg:justify-center min-w-max px-2">
                   <div className="flex flex-col items-center gap-2 cursor-pointer" onClick={() => setSelectedCategory(Category.CRIBS)}>
                      <div className="w-14 h-14 bg-[#C68E68] rounded-2xl flex items-center justify-center text-white shadow-sm transform rotate-3 hover:rotate-0 transition-transform">
                         <Baby className="w-8 h-8" />
@@ -369,24 +369,26 @@ const Home = () => {
                </div>
             </div>
 
-            <div className="px-4 mb-2">
-               <h3 className="font-serif text-xl text-[#2F3E2E]">New Arrivals</h3>
+            <div className="px-4 lg:px-8 mb-2">
+               <h3 className="font-serif text-xl lg:text-2xl text-[#2F3E2E]">New Arrivals</h3>
             </div>
           </>
       )}
 
-      {/* Listing Grid */}
-      <div className={`grid gap-3 p-4 min-h-[50vh] pt-0 ${isMidnight ? 'grid-cols-2' : isRetro ? 'grid-cols-2 gap-4' : isHeirloom ? 'grid-cols-2 gap-4' : 'grid-cols-2'}`}>
+      {/* Listing Grid - Responsive: 2 cols mobile, 3 cols tablet, 4 cols desktop */}
+      <div className={`grid gap-3 lg:gap-6 p-4 lg:px-8 min-h-[50vh] pt-0
+        grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5
+        ${isMidnight ? '' : isRetro ? 'gap-4' : isHeirloom ? 'gap-4' : ''}`}>
         {filteredListings.length > 0 ? (
           filteredListings.map((listing) => (
             <ListingCard key={listing.id} listing={listing} />
           ))
         ) : (
-          <div className="col-span-2 flex flex-col items-center justify-center py-20 text-gray-400">
+          <div className="col-span-full flex flex-col items-center justify-center py-20 text-gray-400">
             <Filter className="w-12 h-12 mb-2 opacity-20" />
             <p>No items found.</p>
-            <button 
-              onClick={() => { setSelectedCategory('All'); setSelectedAge('All'); setSearchTerm(''); setPriceRange({min:'', max:''}); }} 
+            <button
+              onClick={() => { setSelectedCategory('All'); setSelectedAge('All'); setSearchTerm(''); setPriceRange({min:'', max:''}); }}
               className={`mt-6 text-xs font-bold underline ${isMidnight ? 'text-gray-300' : 'text-gray-900'}`}
             >
               Clear Filters
