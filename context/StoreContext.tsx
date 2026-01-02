@@ -1,5 +1,5 @@
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { Listing, User, Conversation, Message, Review, Transaction, TransactionStatus, Report, SavedSearch } from '../types';
 import { MOCK_LISTINGS, MOCK_USERS } from '../constants';
 import { calculateDistance, ZIP_COORDINATES } from '../utils/locationHelpers';
@@ -16,7 +16,8 @@ interface StoreContextType {
   reports: Report[];
   userLocation: { lat: number; lng: number } | null;
   locationStatus: 'idle' | 'locating' | 'located' | 'error';
-  
+  isLoading: boolean;
+
   // Compare Feature
   compareIds: string[];
   toggleCompare: (id: string) => void;
@@ -26,7 +27,7 @@ interface StoreContextType {
   logout: () => void;
   updateUser: (user: User) => void;
   upgradeToPremium: () => void;
-  
+
   // Listings
   addListing: (listing: Listing) => void;
   updateListing: (listing: Listing) => void;
@@ -42,23 +43,23 @@ interface StoreContextType {
   reportListing: (listingId: string, reason: string) => void;
   saveSearch: (search: SavedSearch) => void;
   deleteSavedSearch: (id: string) => void;
-  
+
   // Chat
-  startConversation: (listingId: string) => string;
+  startConversation: (listingId: string) => Promise<string>;
   sendMessage: (conversationId: string, text: string) => void;
   getMessagesByConversationId: (conversationId: string) => Message[];
   getConversationById: (conversationId: string) => Conversation | undefined;
-  
+
   // Reviews
   addReview: (review: Review) => void;
   getReviewsByUserId: (userId: string) => Review[];
-  
+
   // Transactions
-  createTransaction: (listingId: string) => string;
+  createTransaction: (listingId: string) => Promise<string>;
   getTransactionById: (id: string) => Transaction | undefined;
   updateTransactionStatus: (id: string, status: TransactionStatus, updates?: Partial<Transaction>) => void;
   getActiveTransactionForListing: (listingId: string) => Transaction | undefined;
-  
+
   resetStore: () => void;
 }
 
@@ -86,14 +87,242 @@ const safeParse = (key: string, fallback: any) => {
   }
 };
 
-// Explicitly type children as optional to prevent TS errors in certain JSX environments
+// Database row to TypeScript object mappers
+const mapUserFromDB = (row: any): User => ({
+  id: row.id,
+  name: row.username || 'Unknown',
+  isVerifiedParent: row.is_verified_parent || false,
+  isPremium: row.is_premium || false,
+  isAdmin: row.is_admin || false,
+  joinDate: row.created_at,
+  itemsSold: row.items_sold || 0,
+  avatarUrl: row.avatar_url || '',
+  location: row.location_zip || '',
+  bio: row.bio,
+  savedListingIds: row.saved_listing_ids || [],
+  savedSearches: row.saved_searches || [],
+  followingIds: row.following_ids || []
+});
+
+const mapListingFromDB = (row: any): Listing => ({
+  id: row.id,
+  userId: row.user_id,
+  title: row.title,
+  description: row.description,
+  price: Number(row.price),
+  originalPrice: row.original_price ? Number(row.original_price) : undefined,
+  dealAnalysis: row.deal_analysis,
+  condition: row.condition,
+  category: row.category,
+  ageRange: row.age_range,
+  brand: row.brand,
+  model: row.model,
+  manufactureDate: row.manufacture_date,
+  expirationDate: row.expiration_date,
+  isSmokeFree: row.is_smoke_free,
+  isPetFree: row.is_pet_free,
+  images: row.images || [],
+  locationZip: row.location_zip || '98001',
+  isSafetyVerified: row.is_safety_verified,
+  safetyCheckResult: row.safety_check_result,
+  isSold: row.is_sold,
+  isPromoted: row.is_promoted,
+  createdAt: row.created_at,
+  distanceMiles: 0,
+  coordinates: ZIP_COORDINATES[row.location_zip] || undefined
+});
+
+const mapConversationFromDB = (row: any, lastMsg?: Message): Conversation => ({
+  id: row.id,
+  listingId: row.listing_id,
+  participantIds: row.participant_ids || [],
+  lastMessage: lastMsg,
+  updatedAt: row.updated_at
+});
+
+const mapMessageFromDB = (row: any): Message => ({
+  id: row.id,
+  conversationId: row.conversation_id,
+  senderId: row.sender_id,
+  text: row.text,
+  timestamp: row.created_at,
+  isRead: row.is_read
+});
+
+const mapReviewFromDB = (row: any): Review => ({
+  id: row.id,
+  targetUserId: row.target_user_id,
+  authorId: row.author_id,
+  authorName: row.author_name,
+  rating: row.rating,
+  comment: row.comment || '',
+  date: row.created_at
+});
+
+const mapTransactionFromDB = (row: any): Transaction => ({
+  id: row.id,
+  listingId: row.listing_id,
+  buyerId: row.buyer_id,
+  sellerId: row.seller_id,
+  amount: Number(row.amount),
+  platformFee: Number(row.platform_fee),
+  total: Number(row.total),
+  status: row.status as TransactionStatus,
+  meetupLocation: row.meetup_location,
+  meetupTime: row.meetup_time,
+  inspectionPhotoUrl: row.inspection_photo_url,
+  inspectionChecklist: row.inspection_checklist,
+  createdAt: row.created_at,
+  updatedAt: row.updated_at
+});
+
+const mapReportFromDB = (row: any): Report => ({
+  id: row.id,
+  listingId: row.listing_id,
+  reporterId: row.reporter_id,
+  reason: row.reason,
+  timestamp: row.created_at,
+  status: row.status
+});
+
 export const StoreProvider = ({ children }: { children?: ReactNode }) => {
+  const [isLoading, setIsLoading] = useState(true);
+
   // --- Auth State ---
   const [currentUser, setCurrentUser] = useState<User | null>(() => safeParse(STORAGE_KEYS.USER, null));
 
-  const login = (user: User) => {
+  // --- Data State ---
+  const [listings, setListings] = useState<Listing[]>(() => safeParse(STORAGE_KEYS.LISTINGS, MOCK_LISTINGS));
+  const [conversations, setConversations] = useState<Conversation[]>(() => safeParse(STORAGE_KEYS.CONVERSATIONS, []));
+  const [messages, setMessages] = useState<Message[]>(() => safeParse(STORAGE_KEYS.MESSAGES, []));
+  const [reviews, setReviews] = useState<Review[]>(() => {
+    const defaultReviews = [
+      { id: 'r1', targetUserId: 'u2', authorId: 'u4', authorName: 'Emily W.', rating: 5, comment: 'Great seller! Item exactly as described.', date: '2024-03-01' },
+      { id: 'r2', targetUserId: 'u2', authorId: 'u5', authorName: 'Ashley K.', rating: 5, comment: 'Super safe meetup at the police station. Thanks!', date: '2024-02-15' }
+    ];
+    return safeParse(STORAGE_KEYS.REVIEWS, defaultReviews);
+  });
+  const [transactions, setTransactions] = useState<Transaction[]>(() => safeParse(STORAGE_KEYS.TRANSACTIONS, []));
+  const [reports, setReports] = useState<Report[]>(() => safeParse(STORAGE_KEYS.REPORTS, []));
+  const [compareIds, setCompareIds] = useState<string[]>(() => safeParse(STORAGE_KEYS.COMPARE, []));
+  const [locationStatus, setLocationStatus] = useState<'idle' | 'locating' | 'located' | 'error'>('idle');
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+
+  // --- Supabase Data Sync ---
+  useEffect(() => {
+    if (!supabase) {
+      setIsLoading(false);
+      return;
+    }
+
+    const fetchAllData = async () => {
+      if (!supabase) return;
+
+      try {
+        // Fetch listings
+        const { data: listingsData } = await supabase
+          .from('listings')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (listingsData && listingsData.length > 0) {
+          setListings(listingsData.map(mapListingFromDB));
+        }
+
+        // Fetch conversations
+        const { data: convsData } = await supabase
+          .from('conversations')
+          .select('*')
+          .order('updated_at', { ascending: false });
+
+        if (convsData) {
+          // Get all messages to find last message for each conversation
+          const { data: msgsData } = await supabase
+            .from('messages')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+          const mappedMessages = msgsData ? msgsData.map(mapMessageFromDB) : [];
+          setMessages(mappedMessages);
+
+          const mappedConvs = convsData.map(conv => {
+            const lastMsg = mappedMessages.find(m => m.conversationId === conv.id);
+            return mapConversationFromDB(conv, lastMsg);
+          });
+          setConversations(mappedConvs);
+        }
+
+        // Fetch reviews
+        const { data: reviewsData } = await supabase
+          .from('reviews')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (reviewsData && reviewsData.length > 0) {
+          setReviews(reviewsData.map(mapReviewFromDB));
+        }
+
+        // Fetch transactions
+        const { data: txData } = await supabase
+          .from('transactions')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (txData) {
+          setTransactions(txData.map(mapTransactionFromDB));
+        }
+
+        // Fetch reports
+        const { data: reportsData } = await supabase
+          .from('reports')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (reportsData) {
+          setReports(reportsData.map(mapReportFromDB));
+        }
+
+      } catch (err) {
+        console.error("Failed to fetch from Supabase:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchAllData();
+  }, []);
+
+  // --- Persistence to localStorage (fallback) ---
+  useEffect(() => { localStorage.setItem(STORAGE_KEYS.LISTINGS, JSON.stringify(listings)); }, [listings]);
+  useEffect(() => { localStorage.setItem(STORAGE_KEYS.CONVERSATIONS, JSON.stringify(conversations)); }, [conversations]);
+  useEffect(() => { localStorage.setItem(STORAGE_KEYS.MESSAGES, JSON.stringify(messages)); }, [messages]);
+  useEffect(() => { localStorage.setItem(STORAGE_KEYS.REVIEWS, JSON.stringify(reviews)); }, [reviews]);
+  useEffect(() => { localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(transactions)); }, [transactions]);
+  useEffect(() => { localStorage.setItem(STORAGE_KEYS.REPORTS, JSON.stringify(reports)); }, [reports]);
+  useEffect(() => { localStorage.setItem(STORAGE_KEYS.COMPARE, JSON.stringify(compareIds)); }, [compareIds]);
+
+  // --- Auth Functions ---
+  const login = async (user: User) => {
     setCurrentUser(user);
     localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
+
+    // Sync user to Supabase
+    if (supabase) {
+      await supabase.from('users').upsert({
+        id: user.id,
+        username: user.name,
+        location_zip: user.location,
+        is_verified_parent: user.isVerifiedParent,
+        is_premium: user.isPremium,
+        is_admin: user.isAdmin,
+        items_sold: user.itemsSold,
+        avatar_url: user.avatarUrl,
+        bio: user.bio,
+        saved_listing_ids: user.savedListingIds || [],
+        saved_searches: user.savedSearches || [],
+        following_ids: user.followingIds || []
+      });
+    }
   };
 
   const logout = async () => {
@@ -103,9 +332,27 @@ export const StoreProvider = ({ children }: { children?: ReactNode }) => {
     window.location.href = '/#/welcome';
   };
 
-  const updateUser = (updatedUser: User) => {
+  const updateUser = async (updatedUser: User) => {
     setCurrentUser(updatedUser);
     localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(updatedUser));
+
+    // Sync to Supabase
+    if (supabase) {
+      await supabase.from('users').upsert({
+        id: updatedUser.id,
+        username: updatedUser.name,
+        location_zip: updatedUser.location,
+        is_verified_parent: updatedUser.isVerifiedParent,
+        is_premium: updatedUser.isPremium,
+        is_admin: updatedUser.isAdmin,
+        items_sold: updatedUser.itemsSold,
+        avatar_url: updatedUser.avatarUrl,
+        bio: updatedUser.bio,
+        saved_listing_ids: updatedUser.savedListingIds || [],
+        saved_searches: updatedUser.savedSearches || [],
+        following_ids: updatedUser.followingIds || []
+      });
+    }
   };
 
   const upgradeToPremium = () => {
@@ -129,7 +376,6 @@ export const StoreProvider = ({ children }: { children?: ReactNode }) => {
   const saveSearch = (search: SavedSearch) => {
     if (!currentUser) return;
     const currentSearches = currentUser.savedSearches || [];
-    // Limit to 10 saved searches
     const newSearches = [search, ...currentSearches].slice(0, 10);
     updateUser({ ...currentUser, savedSearches: newSearches });
   };
@@ -140,87 +386,6 @@ export const StoreProvider = ({ children }: { children?: ReactNode }) => {
     updateUser({ ...currentUser, savedSearches: currentSearches.filter(s => s.id !== id) });
   };
 
-  // --- Data State ---
-  const [listings, setListings] = useState<Listing[]>(() => safeParse(STORAGE_KEYS.LISTINGS, MOCK_LISTINGS));
-
-  // --- Supabase Data Sync ---
-  useEffect(() => {
-    if (!supabase) return;
-
-    const fetchRemoteListings = async () => {
-      if (!supabase) return;
-      try {
-        const { data, error } = await supabase
-          .from('listings')
-          .select('*')
-          .order('created_at', { ascending: false });
-
-        if (error) {
-          console.error("Supabase error fetching listings:", error);
-          return;
-        }
-
-        if (data && data.length > 0) {
-          // Map DB columns to our Typescript Interface
-          const mappedListings: Listing[] = data.map((row: any) => ({
-            id: row.id,
-            userId: row.user_id,
-            title: row.title,
-            description: row.description,
-            price: Number(row.price),
-            originalPrice: row.original_price ? Number(row.original_price) : undefined,
-            dealAnalysis: row.deal_analysis, // Stored Analysis
-            condition: row.condition,
-            category: row.category,
-            ageRange: row.age_range,
-            brand: row.brand,
-            isSmokeFree: row.is_smoke_free,
-            isPetFree: row.is_pet_free,
-            images: row.images || [],
-            locationZip: row.location_zip || '98001',
-            isSafetyVerified: row.is_safety_verified,
-            isSold: row.is_sold,
-            createdAt: row.created_at,
-            distanceMiles: 0, // Will be updated by geolocation effect
-            coordinates: ZIP_COORDINATES[row.location_zip] || undefined
-          }));
-          setListings(mappedListings);
-        }
-      } catch (err) {
-        console.error("Failed to fetch from Supabase:", err);
-      }
-    };
-
-    fetchRemoteListings();
-  }, []);
-
-  const [conversations, setConversations] = useState<Conversation[]>(() => safeParse(STORAGE_KEYS.CONVERSATIONS, []));
-  const [messages, setMessages] = useState<Message[]>(() => safeParse(STORAGE_KEYS.MESSAGES, []));
-  
-  const [reviews, setReviews] = useState<Review[]>(() => {
-    const defaultReviews = [
-        { id: 'r1', targetUserId: 'u2', authorId: 'u4', authorName: 'Emily W.', rating: 5, comment: 'Great seller! Item exactly as described.', date: '2024-03-01' },
-        { id: 'r2', targetUserId: 'u2', authorId: 'u5', authorName: 'Ashley K.', rating: 5, comment: 'Super safe meetup at the police station. Thanks!', date: '2024-02-15' }
-      ];
-    return safeParse(STORAGE_KEYS.REVIEWS, defaultReviews);
-  });
-
-  const [transactions, setTransactions] = useState<Transaction[]>(() => safeParse(STORAGE_KEYS.TRANSACTIONS, []));
-  const [reports, setReports] = useState<Report[]>(() => safeParse(STORAGE_KEYS.REPORTS, []));
-  const [compareIds, setCompareIds] = useState<string[]>(() => safeParse(STORAGE_KEYS.COMPARE, []));
-
-  const [locationStatus, setLocationStatus] = useState<'idle' | 'locating' | 'located' | 'error'>('idle');
-  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
-
-  // --- Persistence ---
-  useEffect(() => { localStorage.setItem(STORAGE_KEYS.LISTINGS, JSON.stringify(listings)); }, [listings]);
-  useEffect(() => { localStorage.setItem(STORAGE_KEYS.CONVERSATIONS, JSON.stringify(conversations)); }, [conversations]);
-  useEffect(() => { localStorage.setItem(STORAGE_KEYS.MESSAGES, JSON.stringify(messages)); }, [messages]);
-  useEffect(() => { localStorage.setItem(STORAGE_KEYS.REVIEWS, JSON.stringify(reviews)); }, [reviews]);
-  useEffect(() => { localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(transactions)); }, [transactions]);
-  useEffect(() => { localStorage.setItem(STORAGE_KEYS.REPORTS, JSON.stringify(reports)); }, [reports]);
-  useEffect(() => { localStorage.setItem(STORAGE_KEYS.COMPARE, JSON.stringify(compareIds)); }, [compareIds]);
-
   // --- Geolocation ---
   useEffect(() => {
     if (!currentUser) return;
@@ -228,7 +393,7 @@ export const StoreProvider = ({ children }: { children?: ReactNode }) => {
     setLocationStatus('locating');
     let defaultCoords = { lat: 47.3073, lng: -122.2284 };
     if (currentUser.location && currentUser.location.length === 5 && ZIP_COORDINATES[currentUser.location]) {
-       defaultCoords = ZIP_COORDINATES[currentUser.location];
+      defaultCoords = ZIP_COORDINATES[currentUser.location];
     }
     navigator.geolocation.getCurrentPosition(
       (position) => {
@@ -237,7 +402,7 @@ export const StoreProvider = ({ children }: { children?: ReactNode }) => {
         setLocationStatus('located');
         updateListingDistances(latitude, longitude);
       },
-      (error) => {
+      () => {
         setUserLocation(defaultCoords);
         setLocationStatus('error');
         updateListingDistances(defaultCoords.lat, defaultCoords.lng);
@@ -245,14 +410,13 @@ export const StoreProvider = ({ children }: { children?: ReactNode }) => {
     );
   }, [currentUser]);
 
-  // Recalculate distances whenever listings change or location changes
   useEffect(() => {
     if (userLocation) {
       updateListingDistances(userLocation.lat, userLocation.lng);
     }
-  }, [listings.length]); 
+  }, [listings.length]);
 
-  const updateListingDistances = (lat: number, lng: number) => {
+  const updateListingDistances = useCallback((lat: number, lng: number) => {
     setListings(prev => prev.map(listing => {
       let coords = listing.coordinates;
       if (!coords && listing.locationZip && ZIP_COORDINATES[listing.locationZip]) {
@@ -260,20 +424,19 @@ export const StoreProvider = ({ children }: { children?: ReactNode }) => {
       }
       if (coords) {
         const dist = calculateDistance(lat, lng, coords.lat, coords.lng);
-        // Only update if distance changed to avoid infinite loop
         if (listing.distanceMiles !== dist) {
-           return { ...listing, distanceMiles: dist, coordinates: coords };
+          return { ...listing, distanceMiles: dist, coordinates: coords };
         }
       }
       return listing;
     }));
-  };
+  }, []);
 
   // --- Compare Feature ---
   const toggleCompare = (id: string) => {
     setCompareIds(prev => {
       if (prev.includes(id)) return prev.filter(cid => cid !== id);
-      if (prev.length >= 3) return [...prev.slice(1), id]; // Keep max 3, remove oldest
+      if (prev.length >= 3) return [...prev.slice(1), id];
       return [...prev, id];
     });
   };
@@ -292,26 +455,37 @@ export const StoreProvider = ({ children }: { children?: ReactNode }) => {
   const unfollowUser = (targetUserId: string) => {
     if (!currentUser) return;
     const currentFollowing = currentUser.followingIds || [];
-    updateUser({ 
-      ...currentUser, 
-      followingIds: currentFollowing.filter(id => id !== targetUserId) 
+    updateUser({
+      ...currentUser,
+      followingIds: currentFollowing.filter(id => id !== targetUserId)
     });
   };
 
-  const reportListing = (listingId: string, reason: string) => {
+  const reportListing = async (listingId: string, reason: string) => {
     if (!currentUser) return;
     const newReport: Report = {
-        id: generateUUID(),
-        listingId,
-        reporterId: currentUser.id,
-        reason,
-        timestamp: new Date().toISOString(),
-        status: 'pending'
+      id: generateUUID(),
+      listingId,
+      reporterId: currentUser.id,
+      reason,
+      timestamp: new Date().toISOString(),
+      status: 'pending'
     };
     setReports(prev => [...prev, newReport]);
+
+    // Sync to Supabase
+    if (supabase) {
+      await supabase.from('reports').insert({
+        id: newReport.id,
+        listing_id: listingId,
+        reporter_id: currentUser.id,
+        reason,
+        status: 'pending'
+      });
+    }
   };
 
-  // --- Listings & Users ---
+  // --- Listings ---
   const getUserById = (id: string) => {
     if (currentUser && currentUser.id === id) return currentUser;
     const user = MOCK_USERS[id];
@@ -324,72 +498,107 @@ export const StoreProvider = ({ children }: { children?: ReactNode }) => {
   };
 
   const addListing = async (listing: Listing) => {
-    // 1. Optimistic Update
-    const coords = ZIP_COORDINATES[listing.locationZip] || ZIP_COORDINATES['98001']; 
-    const listingWithCoords = { 
-      ...listing, 
+    const coords = ZIP_COORDINATES[listing.locationZip] || ZIP_COORDINATES['98001'];
+    const listingWithCoords = {
+      ...listing,
       coordinates: coords,
       distanceMiles: userLocation ? calculateDistance(userLocation.lat, userLocation.lng, coords.lat, coords.lng) : 0,
       isPromoted: currentUser?.isPremium
     };
     setListings((prev) => [listingWithCoords, ...prev]);
 
-    // 2. Persist to Supabase if connected
+    // Sync to Supabase
     if (supabase && currentUser) {
       try {
-        const { error: userError } = await supabase.from('users').upsert({
-            id: currentUser.id,
-            username: currentUser.name,
-            location_zip: currentUser.location,
-            is_verified_parent: currentUser.isVerifiedParent,
-            items_sold: currentUser.itemsSold,
-            avatar_url: currentUser.avatarUrl
+        // Ensure user exists
+        await supabase.from('users').upsert({
+          id: currentUser.id,
+          username: currentUser.name,
+          location_zip: currentUser.location,
+          is_verified_parent: currentUser.isVerifiedParent,
+          items_sold: currentUser.itemsSold,
+          avatar_url: currentUser.avatarUrl
         });
 
-        if (userError) {
-            console.error("Error syncing user to Supabase:", userError);
-        }
-
-        const { error } = await supabase.from('listings').insert({
+        await supabase.from('listings').insert({
           id: listing.id,
-          user_id: currentUser.id, 
+          user_id: currentUser.id,
           title: listing.title,
           description: listing.description,
           price: listing.price,
-          // Fixed: Use camelCase properties from Listing object to map to snake_case DB columns
           original_price: listing.originalPrice,
-          deal_analysis: listing.dealAnalysis, // Store AI Analysis
+          deal_analysis: listing.dealAnalysis,
           condition: listing.condition,
           category: listing.category,
           age_range: listing.ageRange,
+          brand: listing.brand,
+          model: listing.model,
+          manufacture_date: listing.manufactureDate,
+          expiration_date: listing.expirationDate,
           is_smoke_free: listing.isSmokeFree,
           is_pet_free: listing.isPetFree,
           images: listing.images,
           location_zip: listing.locationZip,
-          is_safety_verified: listing.isSafetyVerified
+          is_safety_verified: listing.isSafetyVerified,
+          safety_check_result: listing.safetyCheckResult,
+          is_promoted: currentUser.isPremium
         });
-        if (error) console.error("Error saving listing to DB:", error);
       } catch (e) {
         console.error("Supabase insert failed", e);
       }
     }
   };
 
-  const updateListing = (updatedListing: Listing) => {
+  const updateListing = async (updatedListing: Listing) => {
     setListings((prev) => prev.map(l => l.id === updatedListing.id ? updatedListing : l));
+
+    if (supabase) {
+      await supabase.from('listings').update({
+        title: updatedListing.title,
+        description: updatedListing.description,
+        price: updatedListing.price,
+        original_price: updatedListing.originalPrice,
+        deal_analysis: updatedListing.dealAnalysis,
+        condition: updatedListing.condition,
+        category: updatedListing.category,
+        age_range: updatedListing.ageRange,
+        brand: updatedListing.brand,
+        model: updatedListing.model,
+        is_smoke_free: updatedListing.isSmokeFree,
+        is_pet_free: updatedListing.isPetFree,
+        images: updatedListing.images,
+        location_zip: updatedListing.locationZip,
+        is_safety_verified: updatedListing.isSafetyVerified,
+        is_sold: updatedListing.isSold
+      }).eq('id', updatedListing.id);
+    }
   };
 
-  const markAsSold = (id: string) => setListings(prev => prev.map(l => l.id === id ? { ...l, isSold: true } : l));
-  const deleteListing = (id: string) => setListings(prev => prev.filter(l => l.id !== id));
+  const markAsSold = async (id: string) => {
+    setListings(prev => prev.map(l => l.id === id ? { ...l, isSold: true } : l));
+    if (supabase) {
+      await supabase.from('listings').update({ is_sold: true }).eq('id', id);
+    }
+  };
+
+  const deleteListing = async (id: string) => {
+    setListings(prev => prev.filter(l => l.id !== id));
+    if (supabase) {
+      await supabase.from('listings').delete().eq('id', id);
+    }
+  };
+
   const getListingById = (id: string) => listings.find((l) => l.id === id);
 
   // --- Chat ---
-  const startConversation = (listingId: string) => {
+  const startConversation = async (listingId: string): Promise<string> => {
     if (!currentUser) throw new Error("Must be logged in");
     const listing = getListingById(listingId);
     if (!listing) throw new Error('Listing not found');
+
     const existing = conversations.find(c => c.listingId === listingId && c.participantIds.includes(currentUser.id));
     if (existing) return existing.id;
+
     const newConv: Conversation = {
       id: generateUUID(),
       listingId,
@@ -397,10 +606,20 @@ export const StoreProvider = ({ children }: { children?: ReactNode }) => {
       updatedAt: new Date().toISOString()
     };
     setConversations(prev => [newConv, ...prev]);
+
+    // Sync to Supabase
+    if (supabase) {
+      await supabase.from('conversations').insert({
+        id: newConv.id,
+        listing_id: listingId,
+        participant_ids: [currentUser.id, listing.userId]
+      });
+    }
+
     return newConv.id;
   };
 
-  const sendMessage = (conversationId: string, text: string) => {
+  const sendMessage = async (conversationId: string, text: string) => {
     if (!currentUser) return;
     const newMessage: Message = {
       id: generateUUID(),
@@ -411,18 +630,61 @@ export const StoreProvider = ({ children }: { children?: ReactNode }) => {
       isRead: false
     };
     setMessages(prev => [...prev, newMessage]);
-    setConversations(prev => prev.map(c => c.id === conversationId ? { ...c, lastMessage: newMessage, updatedAt: new Date().toISOString() } : c));
+    setConversations(prev => prev.map(c =>
+      c.id === conversationId
+        ? { ...c, lastMessage: newMessage, updatedAt: new Date().toISOString() }
+        : c
+    ));
+
+    // Sync to Supabase
+    if (supabase) {
+      await supabase.from('messages').insert({
+        id: newMessage.id,
+        conversation_id: conversationId,
+        sender_id: currentUser.id,
+        text
+      });
+      await supabase.from('conversations').update({
+        updated_at: new Date().toISOString()
+      }).eq('id', conversationId);
+    }
   };
-  
-  const getMessagesByConversationId = (id: string) => messages.filter(m => m.conversationId === id).sort((a,b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+
+  const getMessagesByConversationId = (id: string) =>
+    messages.filter(m => m.conversationId === id).sort((a, b) =>
+      new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+    );
+
   const getConversationById = (id: string) => conversations.find(c => c.id === id);
 
+  // --- Reviews ---
+  const addReview = async (review: Review) => {
+    setReviews(prev => [review, ...prev]);
+
+    if (supabase) {
+      await supabase.from('reviews').insert({
+        id: review.id,
+        target_user_id: review.targetUserId,
+        author_id: review.authorId,
+        author_name: review.authorName,
+        rating: review.rating,
+        comment: review.comment
+      });
+    }
+  };
+
+  const getReviewsByUserId = (userId: string) =>
+    reviews.filter(r => r.targetUserId === userId).sort((a, b) =>
+      new Date(b.date).getTime() - new Date(a.date).getTime()
+    );
+
   // --- Transactions ---
-  const createTransaction = (listingId: string): string => {
+  const createTransaction = async (listingId: string): Promise<string> => {
     if (!currentUser) throw new Error("Must be logged in");
     const listing = listings.find(l => l.id === listingId);
     if (!listing) throw new Error("Listing not found");
-    const platformFee = Math.round(listing.price * 0.08); 
+
+    const platformFee = Math.round(listing.price * 0.08);
     const newTransaction: Transaction = {
       id: generateUUID(),
       listingId,
@@ -436,26 +698,65 @@ export const StoreProvider = ({ children }: { children?: ReactNode }) => {
       updatedAt: new Date().toISOString()
     };
     setTransactions(prev => [...prev, newTransaction]);
+
+    // Sync to Supabase
+    if (supabase) {
+      await supabase.from('transactions').insert({
+        id: newTransaction.id,
+        listing_id: listingId,
+        buyer_id: currentUser.id,
+        seller_id: listing.userId,
+        amount: listing.price,
+        platform_fee: platformFee,
+        total: listing.price + platformFee,
+        status: TransactionStatus.INITIATED
+      });
+    }
+
     return newTransaction.id;
   };
 
   const getTransactionById = (id: string) => transactions.find(t => t.id === id);
-  const getActiveTransactionForListing = (listingId: string) => transactions.find(t => t.listingId === listingId && t.status !== TransactionStatus.CANCELLED && t.status !== TransactionStatus.COMPLETED);
-  const updateTransactionStatus = (id: string, status: TransactionStatus, updates?: Partial<Transaction>) => {
-    setTransactions(prev => prev.map(t => t.id === id ? { ...t, status, ...updates, updatedAt: new Date().toISOString() } : t));
+
+  const getActiveTransactionForListing = (listingId: string) =>
+    transactions.find(t =>
+      t.listingId === listingId &&
+      t.status !== TransactionStatus.CANCELLED &&
+      t.status !== TransactionStatus.COMPLETED
+    );
+
+  const updateTransactionStatus = async (id: string, status: TransactionStatus, updates?: Partial<Transaction>) => {
+    setTransactions(prev => prev.map(t =>
+      t.id === id ? { ...t, status, ...updates, updatedAt: new Date().toISOString() } : t
+    ));
+
     if (status === TransactionStatus.COMPLETED) {
       const tx = transactions.find(t => t.id === id);
       if (tx) markAsSold(tx.listingId);
     }
+
+    // Sync to Supabase
+    if (supabase) {
+      await supabase.from('transactions').update({
+        status,
+        meetup_location: updates?.meetupLocation,
+        meetup_time: updates?.meetupTime,
+        inspection_photo_url: updates?.inspectionPhotoUrl,
+        inspection_checklist: updates?.inspectionChecklist,
+        updated_at: new Date().toISOString()
+      }).eq('id', id);
+    }
   };
 
-  const addReview = (review: Review) => setReviews(prev => [review, ...prev]);
-  const getReviewsByUserId = (userId: string) => reviews.filter(r => r.targetUserId === userId).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  const resetStore = () => { localStorage.clear(); window.location.reload(); };
+  const resetStore = () => {
+    localStorage.clear();
+    window.location.reload();
+  };
 
   return (
-    <StoreContext.Provider value={{ 
-      listings, currentUser, conversations, messages, reviews, transactions, reports, userLocation, locationStatus,
+    <StoreContext.Provider value={{
+      listings, currentUser, conversations, messages, reviews, transactions, reports,
+      userLocation, locationStatus, isLoading,
       login, logout, updateUser, upgradeToPremium,
       addListing, updateListing, getListingById, deleteListing, markAsSold, toggleFavorite,
       getUserById, followUser, unfollowUser, reportListing, saveSearch, deleteSavedSearch,

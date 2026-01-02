@@ -185,12 +185,12 @@ const Chat = () => {
     setShowReviewModal(false);
   };
 
-  const handleConfirmPlan = () => {
+  const handleConfirmPlan = async () => {
     if (!detectedPlan) return;
-    
+
     let txId = activeTransaction?.id;
     if (!txId) {
-        txId = createTransaction(listing.id);
+        txId = await createTransaction(listing.id);
     }
 
     updateTransactionStatus(txId, TransactionStatus.MEETUP_AGREED, {

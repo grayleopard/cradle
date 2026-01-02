@@ -89,12 +89,12 @@ const ListingDetail = () => {
     navigate('/');
   };
 
-  const handleMessageSeller = () => {
-    const conversationId = startConversation(listing.id);
+  const handleMessageSeller = async () => {
+    const conversationId = await startConversation(listing.id);
     navigate(`/chat/${conversationId}`);
   };
 
-  const handleRequestToBuy = () => {
+  const handleRequestToBuy = async () => {
     if (!currentUser) {
         navigate('/welcome');
         return;
@@ -103,12 +103,12 @@ const ListingDetail = () => {
         navigate(`/transaction/${activeTransaction.id}`);
         return;
     }
-    
+
     // 1. Create the Transaction record
-    const txId = createTransaction(listing.id);
+    const txId = await createTransaction(listing.id);
 
     // 2. Automatically start chat & notify seller
-    const conversationId = startConversation(listing.id);
+    const conversationId = await startConversation(listing.id);
     sendMessage(conversationId, "👋 I'm interested in buying this! I've sent a formal purchase request.");
 
     showToast("Request sent! Seller notified in chat.", "success");

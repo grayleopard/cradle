@@ -78,17 +78,17 @@ describe('StoreContext (Business Logic)', () => {
   });
 
   describe('Transaction State Machine', () => {
-    it('should progress through the full escrow flow', () => {
+    it('should progress through the full escrow flow', async () => {
       const { result } = renderHook(() => useStore(), { wrapper });
-      
+
       // Setup: Login Buyer
       const buyer = { id: 'buyer1', name: 'Buyer', isVerifiedParent: true, joinDate: '', itemsSold: 0, avatarUrl: '', location: '98001' };
-      act(() => result.current.login(buyer));
+      await act(async () => result.current.login(buyer));
 
       // 1. Create Transaction (INITIATED)
       let txId = '';
-      act(() => {
-        txId = result.current.createTransaction('l1'); // l1 is a mock listing
+      await act(async () => {
+        txId = await result.current.createTransaction('l1'); // l1 is a mock listing
       });
 
       let tx = result.current.getTransactionById(txId);
@@ -96,19 +96,19 @@ describe('StoreContext (Business Logic)', () => {
       expect(tx?.platformFee).toBeGreaterThan(0); // Check fee calculation
 
       // 2. Accept (ACCEPTED)
-      act(() => {
+      await act(async () => {
         result.current.updateTransactionStatus(txId, TransactionStatus.ACCEPTED);
       });
       expect(result.current.getTransactionById(txId)?.status).toBe(TransactionStatus.ACCEPTED);
 
       // 3. Pay (PAYMENT_HELD)
-      act(() => {
+      await act(async () => {
         result.current.updateTransactionStatus(txId, TransactionStatus.PAYMENT_HELD);
       });
       expect(result.current.getTransactionById(txId)?.status).toBe(TransactionStatus.PAYMENT_HELD);
 
       // 4. Meetup & Inspect (INSPECTION_PENDING -> COMPLETED)
-      act(() => {
+      await act(async () => {
         result.current.updateTransactionStatus(txId, TransactionStatus.COMPLETED, {
           inspectionChecklist: { matchesDescription: true, conditionAcceptable: true, noUndisclosedDamage: true }
         });
@@ -116,26 +116,26 @@ describe('StoreContext (Business Logic)', () => {
 
       tx = result.current.getTransactionById(txId);
       expect(tx?.status).toBe(TransactionStatus.COMPLETED);
-      
+
       // 5. Verify Item is Marked Sold
       const listing = result.current.getListingById('l1');
       expect(listing?.isSold).toBe(true);
     });
 
-    it('should allow dispute resolution by admin (cancellation)', () => {
+    it('should allow dispute resolution by admin (cancellation)', async () => {
       const { result } = renderHook(() => useStore(), { wrapper });
-      act(() => result.current.login({ id: 'admin', name: 'Admin', isVerifiedParent: true, joinDate: '', itemsSold: 0, avatarUrl: '', location: '' }));
-      
+      await act(async () => result.current.login({ id: 'admin', name: 'Admin', isVerifiedParent: true, joinDate: '', itemsSold: 0, avatarUrl: '', location: '' }));
+
       let txId = '';
-      act(() => { txId = result.current.createTransaction('l1'); });
-      
+      await act(async () => { txId = await result.current.createTransaction('l1'); });
+
       // Move to disputed
-      act(() => {
+      await act(async () => {
         result.current.updateTransactionStatus(txId, TransactionStatus.DISPUTED);
       });
 
       // Resolve as Refund (Cancelled)
-      act(() => {
+      await act(async () => {
         result.current.updateTransactionStatus(txId, TransactionStatus.CANCELLED);
       });
 
