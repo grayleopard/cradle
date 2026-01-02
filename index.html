@@ -1,0 +1,147 @@
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="theme-color" content="#F9F6F0" />
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <title>Cradle - Safe Baby Gear Marketplace</title>
+    <link rel="manifest" href="/manifest.json">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@500;700&family=Quicksand:wght@500;600;700&family=Playfair+Display:wght@600;700&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['var(--font-primary)', 'sans-serif'],
+              serif: ['var(--font-secondary)', 'serif'],
+            },
+            colors: {
+              brand: {
+                50: 'var(--color-brand-50)',
+                100: 'var(--color-brand-100)',
+                500: 'var(--color-brand-500)', 
+                600: 'var(--color-brand-600)',
+                700: 'var(--color-brand-700)',
+              },
+              bg: {
+                main: 'var(--color-bg-main)',
+                card: 'var(--color-bg-card)',
+              }
+            },
+            borderRadius: {
+              'card': 'var(--radius-card)',
+              'btn': 'var(--radius-btn)',
+            },
+            boxShadow: {
+              'retro': '4px 4px 0px 0px rgba(0,0,0,1)',
+            }
+          },
+        },
+      }
+    </script>
+    <style>
+      :root {
+        /* Default Theme (Cradle Classic) */
+        --font-primary: 'Inter';
+        --font-secondary: 'Inter';
+        --color-brand-50: #f0fdf9;
+        --color-brand-100: #ccfbf1;
+        --color-brand-500: #14b8a6;
+        --color-brand-600: #0d9488;
+        --color-brand-700: #0f766e;
+        --color-bg-main: #f9fafb;
+        --color-bg-card: #ffffff;
+        --radius-card: 0.75rem;
+        --radius-btn: 0.75rem;
+      }
+
+      [data-theme='midnight'] {
+        /* Midnight (Dark Mode) */
+        --font-primary: 'Inter';
+        --font-secondary: 'Inter';
+        --color-brand-50: #27272a;
+        --color-brand-100: #3f3f46;
+        --color-brand-500: #2dd4bf;
+        --color-brand-600: #14b8a6;
+        --color-brand-700: #f0fdf9;
+        --color-bg-main: #09090b;
+        --color-bg-card: #18181b;
+        --radius-card: 1rem;
+        --radius-btn: 1rem;
+      }
+
+      [data-theme='retro'] {
+        /* Retro Pop */
+        --font-primary: 'Space Grotesk';
+        --font-secondary: 'Space Grotesk';
+        --color-brand-50: #ffedd5;
+        --color-brand-100: #fed7aa;
+        --color-brand-500: #f97316;
+        --color-brand-600: #000000;
+        --color-brand-700: #ea580c;
+        --color-bg-main: #fff7ed;
+        --color-bg-card: #ffffff;
+        --radius-card: 0px;
+        --radius-btn: 0px;
+      }
+
+      [data-theme='heirloom'] {
+        /* Heirloom */
+        --font-primary: 'DM Sans';
+        --font-secondary: 'Playfair Display';
+        --color-brand-50: #F5EBE0;
+        --color-brand-100: #E3D5CA;
+        --color-brand-500: #C68E68;
+        --color-brand-600: #B07D5B;
+        --color-brand-700: #2F3E2E;
+        --color-bg-main: #F9F6F0;
+        --color-bg-card: #FFFFFF;
+        --radius-card: 1.5rem;
+        --radius-btn: 9999px;
+      }
+
+      body {
+        background-color: var(--color-bg-main);
+        font-family: var(--font-primary), sans-serif;
+        transition: background-color 0.3s ease;
+      }
+
+      .no-scrollbar::-webkit-scrollbar {
+        display: none;
+      }
+      .no-scrollbar {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "react": "https://esm.sh/react@^19.2.3",
+    "@google/genai": "https://esm.sh/@google/genai@^1.34.0",
+    "react-router-dom": "https://esm.sh/react-router-dom@^7.11.0",
+    "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@^2.89.0",
+    "vite": "https://esm.sh/vite@^7.3.0",
+    "@testing-library/react": "https://esm.sh/@testing-library/react@^16.3.1",
+    "vitest": "https://esm.sh/vitest@^4.0.16",
+    "@testing-library/jest-dom": "https://esm.sh/@testing-library/jest-dom@^6.9.1",
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body>
+    <div id="root"></div>
+    <!-- Vite entry point -->
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>

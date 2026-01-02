@@ -1,0 +1,22 @@
+
+{
+  "name": "Cradle",
+  "short_name": "Cradle",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#F9F6F0",
+  "theme_color": "#C68E68",
+  "description": "Safe, curated marketplace for baby & kids gear.",
+  "icons": [
+    {
+      "src": "https://api.dicebear.com/7.x/initials/svg?seed=CR&backgroundColor=C68E68",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "https://api.dicebear.com/7.x/initials/svg?seed=CR&backgroundColor=C68E68",
+      "sizes": "512x512",
+      "type": "image/svg+xml"
+    }
+  ]
+}

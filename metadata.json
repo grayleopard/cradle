@@ -1,0 +1,9 @@
+{
+  "name": "Cradle",
+  "description": "A hyper-local marketplace for baby and kids gear with AI-powered safety verification.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "geolocation"
+  ]
+}
