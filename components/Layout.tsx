@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from 'react';
-import { Home, PlusCircle, User as UserIcon, MessageCircle, MapPin, Scale, Search, Settings, LogOut } from 'lucide-react';
+import { Home, PlusCircle, User as UserIcon, MessageCircle, MapPin, Scale, Settings, LogOut, ChevronDown } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useStore } from '../context/StoreContext';
 import { useTheme } from '../context/ThemeContext';
@@ -11,6 +11,7 @@ export const Layout = ({ children }: { children?: React.ReactNode }) => {
   const { locationStatus, compareIds, messages, currentUser, logout } = useStore();
   const { theme } = useTheme();
   const mainRef = useRef<HTMLDivElement>(null);
+  const [showUserMenu, setShowUserMenu] = React.useState(false);
 
   const isActive = (path: string) => location.pathname === path;
   const isListingDetail = location.pathname.startsWith('/listing/');
@@ -30,6 +31,15 @@ export const Layout = ({ children }: { children?: React.ReactNode }) => {
       mainRef.current.scrollTop = 0;
     }
   }, [location.pathname]);
+
+  // Close user menu when clicking outside
+  useEffect(() => {
+    const handleClick = () => setShowUserMenu(false);
+    if (showUserMenu) {
+      document.addEventListener('click', handleClick);
+      return () => document.removeEventListener('click', handleClick);
+    }
+  }, [showUserMenu]);
 
   const getLocationText = () => {
     if (locationStatus === 'locating') return 'Locating...';
@@ -52,23 +62,23 @@ export const Layout = ({ children }: { children?: React.ReactNode }) => {
     return 'bg-gray-50';
   };
 
-  const getSidebarBg = () => {
+  const getNavBg = () => {
     if (isMidnight) return 'bg-gray-900 border-gray-800';
-    if (isRetro) return 'bg-white border-black border-r-2';
+    if (isRetro) return 'bg-white border-black border-b-2';
     if (isHeirloom) return 'bg-[#F9F6F0] border-[#E3D5CA]';
     return 'bg-white border-gray-200';
   };
 
-  const getTextColor = (active: boolean) => {
+  const getNavLinkStyle = (active: boolean) => {
     if (active) {
-      if (isMidnight) return 'text-brand-400 bg-gray-800';
-      if (isRetro) return 'text-black bg-yellow-300 border-2 border-black';
-      if (isHeirloom) return 'text-[#C68E68] bg-[#F5EBE0]';
-      return 'text-brand-600 bg-brand-50';
+      if (isMidnight) return 'text-white border-brand-500';
+      if (isRetro) return 'text-black border-black';
+      if (isHeirloom) return 'text-[#C68E68] border-[#C68E68]';
+      return 'text-brand-600 border-brand-600';
     }
-    if (isMidnight) return 'text-gray-400 hover:text-white hover:bg-gray-800';
-    if (isHeirloom) return 'text-[#2F3E2E]/60 hover:text-[#2F3E2E] hover:bg-[#F5EBE0]';
-    return 'text-gray-600 hover:text-gray-900 hover:bg-gray-100';
+    if (isMidnight) return 'text-gray-400 border-transparent hover:text-white';
+    if (isHeirloom) return 'text-[#2F3E2E]/60 border-transparent hover:text-[#2F3E2E]';
+    return 'text-gray-600 border-transparent hover:text-gray-900';
   };
 
   const getMobileNavBg = () => {
@@ -80,165 +90,149 @@ export const Layout = ({ children }: { children?: React.ReactNode }) => {
 
   return (
     <div className={`min-h-screen ${getBgColor()}`}>
-      {/* Desktop Sidebar - Hidden on mobile */}
-      <aside className={`hidden lg:flex lg:flex-col lg:fixed lg:inset-y-0 lg:left-0 lg:w-64 lg:border-r ${getSidebarBg()}`}>
-        {/* Logo */}
-        <div className={`flex items-center gap-3 px-6 py-5 border-b ${isMidnight ? 'border-gray-800' : isHeirloom ? 'border-[#E3D5CA]' : 'border-gray-200'}`}>
-          <div className={`w-10 h-10 flex items-center justify-center text-white font-bold text-xl ${isRetro ? 'bg-black rounded-none' : 'rounded-xl bg-brand-500'}`}>
-            C
-          </div>
-          <div>
-            <h1 className={`font-bold text-xl ${isMidnight ? 'text-white' : isHeirloom ? 'text-[#2F3E2E]' : 'text-gray-900'}`}>
-              {isHeirloom ? 'Heirloom' : 'Cradle'}
-            </h1>
-            <p className={`text-xs ${isMidnight ? 'text-gray-500' : 'text-gray-500'}`}>
-              {isHeirloom ? 'Exchange' : 'Baby Gear Marketplace'}
-            </p>
-          </div>
-        </div>
-
-        {/* Location */}
-        <div className={`px-6 py-3 border-b ${isMidnight ? 'border-gray-800' : isHeirloom ? 'border-[#E3D5CA]' : 'border-gray-200'}`}>
-          <div className={`flex items-center gap-2 text-sm ${isMidnight ? 'text-gray-400' : 'text-gray-600'}`}>
-            <MapPin className="w-4 h-4 text-brand-500" />
-            {getLocationText()}
-          </div>
-        </div>
-
-        {/* Navigation */}
-        <nav className="flex-1 px-4 py-6 space-y-2">
-          {navItems.map((item) => (
-            <Link
-              key={item.path}
-              to={item.path}
-              className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all ${getTextColor(isActive(item.path))}`}
-            >
-              <item.icon className={`w-5 h-5 ${item.isAction && !isActive(item.path) ? 'text-brand-500' : ''}`} />
-              <span>{item.label}</span>
-              {item.badge && item.badge > 0 && (
-                <span className="ml-auto bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
-                  {item.badge > 9 ? '9+' : item.badge}
-                </span>
-              )}
-            </Link>
-          ))}
-        </nav>
-
-        {/* Bottom section */}
-        <div className={`px-4 py-4 border-t space-y-2 ${isMidnight ? 'border-gray-800' : isHeirloom ? 'border-[#E3D5CA]' : 'border-gray-200'}`}>
-          <Link
-            to="/settings/dev"
-            className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all ${getTextColor(isActive('/settings/dev'))}`}
-          >
-            <Settings className="w-5 h-5" />
-            <span>Settings</span>
-          </Link>
-          {currentUser && (
-            <button
-              onClick={logout}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all ${isMidnight ? 'text-gray-400 hover:text-red-400 hover:bg-gray-800' : 'text-gray-600 hover:text-red-600 hover:bg-red-50'}`}
-            >
-              <LogOut className="w-5 h-5" />
-              <span>Sign Out</span>
-            </button>
-          )}
-        </div>
-      </aside>
-
-      {/* Main Content Area */}
-      <div className="lg:pl-64">
-        {/* Mobile Header - Hidden on desktop and listing detail */}
-        {!isListingDetail && (
-          <header className={`lg:hidden sticky top-0 z-50 px-4 py-3 flex items-center justify-between border-b backdrop-blur-md
-            ${isMidnight ? 'bg-gray-900/90 border-gray-800 text-white'
-              : isRetro ? 'bg-white border-black border-b-2'
-              : isHeirloom ? 'bg-[#F9F6F0] border-[#E3D5CA]'
-              : 'bg-white/90 border-gray-100'}`}
-          >
-            <div className="flex items-center gap-2">
-              {!isHeirloom && (
-                <>
-                  <div className={`w-8 h-8 flex items-center justify-center text-white font-bold text-lg ${isRetro ? 'bg-black rounded-none' : 'rounded-lg bg-brand-500'}`}>C</div>
-                  <h1 className={`font-bold text-xl tracking-tight ${isMidnight ? 'text-white' : 'text-gray-900'}`}>Cradle</h1>
-                </>
-              )}
-              {isHeirloom && location.pathname !== '/' && (
-                <h1 className="font-serif text-xl text-[#2F3E2E]">Heirloom Exchange</h1>
-              )}
-            </div>
-            {!isHeirloom && (
-              <div className={`flex items-center gap-1 text-xs font-medium px-2 py-1 ${isRetro ? 'bg-yellow-300 border-2 border-black text-black' : isMidnight ? 'bg-gray-800 text-gray-300 rounded-full' : 'bg-gray-100 rounded-full text-gray-500'}`}>
-                <MapPin className={`w-3 h-3 ${isRetro ? 'text-black' : 'text-brand-500'}`} />
-                {getLocationText()}
-              </div>
-            )}
-          </header>
-        )}
-
-        {/* Desktop Header */}
-        {!isListingDetail && (
-          <header className={`hidden lg:flex sticky top-0 z-40 px-8 py-4 items-center justify-between border-b backdrop-blur-md
-            ${isMidnight ? 'bg-black/90 border-gray-800'
-              : isHeirloom ? 'bg-[#F9F6F0]/90 border-[#E3D5CA]'
-              : 'bg-gray-50/90 border-gray-200'}`}
-          >
-            <div>
-              <h2 className={`text-2xl font-bold ${isMidnight ? 'text-white' : isHeirloom ? 'text-[#2F3E2E]' : 'text-gray-900'}`}>
-                {location.pathname === '/' && 'Discover'}
-                {location.pathname === '/sell' && 'Create Listing'}
-                {location.pathname === '/messages' && 'Messages'}
-                {location.pathname === '/profile' && 'Profile'}
-                {location.pathname === '/compare' && 'Compare'}
-                {location.pathname.startsWith('/chat/') && 'Chat'}
-                {location.pathname.startsWith('/user/') && 'Seller Profile'}
-                {!['/', '/sell', '/messages', '/profile', '/compare'].includes(location.pathname) &&
-                  !location.pathname.startsWith('/chat/') &&
-                  !location.pathname.startsWith('/user/') &&
-                  !location.pathname.startsWith('/listing/') &&
-                  'Cradle'}
-              </h2>
-            </div>
-            <div className="flex items-center gap-4">
-              {currentUser && (
-                <div className={`flex items-center gap-3 ${isMidnight ? 'text-gray-300' : 'text-gray-600'}`}>
-                  <img
-                    src={currentUser.avatarUrl}
-                    alt={currentUser.name}
-                    className="w-8 h-8 rounded-full object-cover"
-                  />
-                  <span className="font-medium">{currentUser.name}</span>
+      {/* Desktop Top Navigation - Hidden on mobile */}
+      {!isListingDetail && (
+        <header className={`hidden lg:block sticky top-0 z-50 border-b ${getNavBg()}`}>
+          <div className="max-w-7xl mx-auto px-6">
+            <div className="flex items-center justify-between h-16">
+              {/* Logo */}
+              <Link to="/" className="flex items-center gap-3">
+                <div className={`w-9 h-9 flex items-center justify-center text-white font-bold text-lg ${isRetro ? 'bg-black rounded-none' : 'rounded-xl bg-brand-500'}`}>
+                  C
                 </div>
-              )}
+                <div>
+                  <h1 className={`font-bold text-lg leading-tight ${isMidnight ? 'text-white' : isHeirloom ? 'text-[#2F3E2E]' : 'text-gray-900'}`}>
+                    {isHeirloom ? 'Heirloom' : 'Cradle'}
+                  </h1>
+                </div>
+              </Link>
+
+              {/* Center Navigation */}
+              <nav className="flex items-center gap-1">
+                {navItems.map((item) => (
+                  <Link
+                    key={item.path}
+                    to={item.path}
+                    className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 -mb-[1px] transition-colors ${getNavLinkStyle(isActive(item.path))}`}
+                  >
+                    <item.icon className={`w-4 h-4 ${item.isAction && !isActive(item.path) ? 'text-brand-500' : ''}`} />
+                    <span>{item.label}</span>
+                    {item.badge && item.badge > 0 && (
+                      <span className="bg-red-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+                        {item.badge > 9 ? '9+' : item.badge}
+                      </span>
+                    )}
+                  </Link>
+                ))}
+              </nav>
+
+              {/* Right Section - Location & User */}
+              <div className="flex items-center gap-4">
+                {/* Location */}
+                <div className={`flex items-center gap-1.5 text-sm ${isMidnight ? 'text-gray-400' : 'text-gray-500'}`}>
+                  <MapPin className="w-4 h-4 text-brand-500" />
+                  <span>{getLocationText()}</span>
+                </div>
+
+                {/* User Menu */}
+                {currentUser && (
+                  <div className="relative">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setShowUserMenu(!showUserMenu); }}
+                      className={`flex items-center gap-2 p-1.5 rounded-full transition-colors ${isMidnight ? 'hover:bg-gray-800' : 'hover:bg-gray-100'}`}
+                    >
+                      <img
+                        src={currentUser.avatarUrl}
+                        alt={currentUser.name}
+                        className="w-8 h-8 rounded-full object-cover"
+                      />
+                      <ChevronDown className={`w-4 h-4 ${isMidnight ? 'text-gray-400' : 'text-gray-500'}`} />
+                    </button>
+
+                    {/* Dropdown Menu */}
+                    {showUserMenu && (
+                      <div className={`absolute right-0 mt-2 w-48 rounded-xl shadow-lg border py-1 ${isMidnight ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'}`}>
+                        <div className={`px-4 py-2 border-b ${isMidnight ? 'border-gray-800' : 'border-gray-100'}`}>
+                          <p className={`font-medium text-sm ${isMidnight ? 'text-white' : 'text-gray-900'}`}>{currentUser.name}</p>
+                          <p className={`text-xs ${isMidnight ? 'text-gray-500' : 'text-gray-500'}`}>{currentUser.location}</p>
+                        </div>
+                        <Link
+                          to="/settings/dev"
+                          className={`flex items-center gap-2 px-4 py-2 text-sm ${isMidnight ? 'text-gray-300 hover:bg-gray-800' : 'text-gray-700 hover:bg-gray-50'}`}
+                        >
+                          <Settings className="w-4 h-4" />
+                          Settings
+                        </Link>
+                        <button
+                          onClick={logout}
+                          className={`w-full flex items-center gap-2 px-4 py-2 text-sm ${isMidnight ? 'text-red-400 hover:bg-gray-800' : 'text-red-600 hover:bg-red-50'}`}
+                        >
+                          <LogOut className="w-4 h-4" />
+                          Sign Out
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
-          </header>
+          </div>
+        </header>
+      )}
+
+      {/* Mobile Header - Hidden on desktop and listing detail */}
+      {!isListingDetail && (
+        <header className={`lg:hidden sticky top-0 z-50 px-4 py-3 flex items-center justify-between border-b backdrop-blur-md
+          ${isMidnight ? 'bg-gray-900/90 border-gray-800 text-white'
+            : isRetro ? 'bg-white border-black border-b-2'
+            : isHeirloom ? 'bg-[#F9F6F0] border-[#E3D5CA]'
+            : 'bg-white/90 border-gray-100'}`}
+        >
+          <div className="flex items-center gap-2">
+            {!isHeirloom && (
+              <>
+                <div className={`w-8 h-8 flex items-center justify-center text-white font-bold text-lg ${isRetro ? 'bg-black rounded-none' : 'rounded-lg bg-brand-500'}`}>C</div>
+                <h1 className={`font-bold text-xl tracking-tight ${isMidnight ? 'text-white' : 'text-gray-900'}`}>Cradle</h1>
+              </>
+            )}
+            {isHeirloom && location.pathname !== '/' && (
+              <h1 className="font-serif text-xl text-[#2F3E2E]">Heirloom Exchange</h1>
+            )}
+          </div>
+          {!isHeirloom && (
+            <div className={`flex items-center gap-1 text-xs font-medium px-2 py-1 ${isRetro ? 'bg-yellow-300 border-2 border-black text-black' : isMidnight ? 'bg-gray-800 text-gray-300 rounded-full' : 'bg-gray-100 rounded-full text-gray-500'}`}>
+              <MapPin className={`w-3 h-3 ${isRetro ? 'text-black' : 'text-brand-500'}`} />
+              {getLocationText()}
+            </div>
+          )}
+        </header>
+      )}
+
+      {/* Main Content */}
+      <main
+        ref={mainRef}
+        className={`min-h-screen pb-24 lg:pb-8 ${isMidnight ? 'bg-black' : ''}`}
+      >
+        <div className="max-w-7xl mx-auto">
+          {children}
+        </div>
+
+        {/* Compare FAB */}
+        {compareIds.length > 0 && !location.pathname.includes('/compare') && (
+          <button
+            onClick={() => navigate('/compare')}
+            className={`fixed bottom-24 lg:bottom-8 right-6 z-40 px-5 py-3 font-bold shadow-xl flex items-center gap-2 hover:scale-105 transition-transform ${isRetro ? 'bg-yellow-400 text-black border-2 border-black shadow-retro rounded-none' : 'bg-gray-900 text-white rounded-full'}`}
+          >
+            <Scale className="w-4 h-4" />
+            Compare ({compareIds.length})
+          </button>
         )}
 
-        {/* Main Content */}
-        <main
-          ref={mainRef}
-          className={`min-h-screen pb-24 lg:pb-8 ${isMidnight ? 'bg-black' : ''}`}
-        >
-          <div className="max-w-7xl mx-auto">
-            {children}
-          </div>
-
-          {/* Compare FAB */}
-          {compareIds.length > 0 && !location.pathname.includes('/compare') && (
-            <button
-              onClick={() => navigate('/compare')}
-              className={`fixed bottom-24 lg:bottom-8 right-6 z-40 px-5 py-3 font-bold shadow-xl flex items-center gap-2 hover:scale-105 transition-transform ${isRetro ? 'bg-yellow-400 text-black border-2 border-black shadow-retro rounded-none' : 'bg-gray-900 text-white rounded-full'}`}
-            >
-              <Scale className="w-4 h-4" />
-              Compare ({compareIds.length})
-            </button>
-          )}
-
-          {/* Concierge - Hidden in chat pages */}
-          {!location.pathname.includes('/messages') && !location.pathname.includes('/chat') && (
-            <Concierge />
-          )}
-        </main>
-      </div>
+        {/* Concierge - Hidden in chat pages */}
+        {!location.pathname.includes('/messages') && !location.pathname.includes('/chat') && (
+          <Concierge />
+        )}
+      </main>
 
       {/* Mobile Bottom Nav - Hidden on desktop and listing detail */}
       {!isListingDetail && (
