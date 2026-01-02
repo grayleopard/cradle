@@ -161,14 +161,14 @@ const Concierge = () => {
 
   if (!isOpen) {
     return (
-      <button 
+      <button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-24 right-6 z-40 w-14 h-14 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-full shadow-xl flex items-center justify-center text-white hover:scale-110 transition-transform animate-in zoom-in"
+        className="fixed bottom-24 right-6 z-40 w-14 h-14 bg-brand-600 rounded-full shadow-xl flex items-center justify-center text-white hover:scale-110 transition-transform animate-in zoom-in"
       >
         <Sparkles className="w-7 h-7" />
         <span className="absolute -top-1 -right-1 flex h-3 w-3">
-          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
-          <span className="relative inline-flex rounded-full h-3 w-3 bg-purple-500"></span>
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-500 opacity-75"></span>
+          <span className="relative inline-flex rounded-full h-3 w-3 bg-brand-600"></span>
         </span>
       </button>
     );
@@ -176,13 +176,13 @@ const Concierge = () => {
 
   if (isMinimized) {
     return (
-       <div 
+       <div
          onClick={() => setIsMinimized(false)}
-         className="fixed bottom-24 right-6 z-40 bg-white border border-gray-200 shadow-xl rounded-full px-4 py-3 flex items-center gap-2 cursor-pointer hover:bg-gray-50 transition-colors animate-in fade-in"
+         className="fixed bottom-24 right-6 z-40 bg-white border border-brand-100 shadow-xl rounded-full px-4 py-3 flex items-center gap-2 cursor-pointer hover:bg-brand-50 transition-colors animate-in fade-in"
        >
-          <Sparkles className="w-4 h-4 text-purple-600" />
+          <Sparkles className="w-4 h-4 text-brand-600" />
           <span className="text-sm font-bold text-gray-800">Concierge</span>
-          <button onClick={(e) => { e.stopPropagation(); setIsOpen(false); }} className="ml-2 p-1 hover:bg-gray-200 rounded-full">
+          <button onClick={(e) => { e.stopPropagation(); setIsOpen(false); }} className="ml-2 p-1 hover:bg-brand-100 rounded-full">
             <X className="w-3 h-3 text-gray-400" />
           </button>
        </div>
@@ -190,9 +190,9 @@ const Concierge = () => {
   }
 
   return (
-    <div className="fixed bottom-[max(20px,env(safe-area-inset-bottom))] right-4 z-[100] w-[calc(100vw-32px)] max-w-sm bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden flex flex-col max-h-[70dvh] animate-in slide-in-from-bottom-10 fade-in transition-all">
+    <div className="fixed bottom-[max(20px,env(safe-area-inset-bottom))] right-4 z-[100] w-[calc(100vw-32px)] max-w-sm bg-white rounded-2xl shadow-2xl border border-brand-100 overflow-hidden flex flex-col max-h-[70dvh] animate-in slide-in-from-bottom-10 fade-in transition-all">
        {/* Header */}
-       <div className={`p-4 flex justify-between items-center text-white transition-colors duration-500 ${isLiveMode ? 'bg-gray-900' : 'bg-gradient-to-r from-indigo-600 to-purple-600'}`}>
+       <div className={`p-4 flex justify-between items-center text-white transition-colors duration-500 ${isLiveMode ? 'bg-brand-700' : 'bg-brand-600'}`}>
           <div className="flex items-center gap-2">
              <div className="bg-white/20 p-1.5 rounded-lg">
                 {isLiveMode ? <Headphones className="w-5 h-5 animate-pulse" /> : <Sparkles className="w-5 h-5" />}
@@ -209,19 +209,19 @@ const Concierge = () => {
        </div>
 
        {isLiveMode ? (
-         <div className="flex-1 bg-gray-900 flex flex-col items-center justify-center p-8 text-center space-y-8 relative overflow-hidden h-[350px]">
+         <div className="flex-1 bg-brand-700 flex flex-col items-center justify-center p-8 text-center space-y-8 relative overflow-hidden h-[350px]">
              <div className="absolute inset-0 flex items-center justify-center opacity-20 pointer-events-none">
-                <div className="w-64 h-64 bg-indigo-500 rounded-full blur-3xl transition-transform duration-100" style={{ transform: `scale(${1 + liveVolume})` }}></div>
+                <div className="w-64 h-64 bg-brand-500 rounded-full blur-3xl transition-transform duration-100" style={{ transform: `scale(${1 + liveVolume})` }}></div>
              </div>
              <div className="relative z-10">
-                <div className={`w-32 h-32 rounded-full border-4 flex items-center justify-center transition-all duration-500 ${liveStatus === 'connected' ? 'border-indigo-500 shadow-[0_0_30px_rgba(99,102,241,0.5)]' : 'border-gray-700'}`}>
+                <div className={`w-32 h-32 rounded-full border-4 flex items-center justify-center transition-all duration-500 ${liveStatus === 'connected' ? 'border-brand-500 shadow-[0_0_30px_rgba(198,142,104,0.5)]' : 'border-brand-700/50'}`}>
                    {liveStatus === 'connecting' ? (
-                      <Loader2 className="w-12 h-12 text-gray-500 animate-spin" />
+                      <Loader2 className="w-12 h-12 text-brand-100 animate-spin" />
                    ) : (
                       <div className="flex gap-1 items-end h-12">
-                         <div className="w-2 bg-indigo-500 rounded-full transition-all duration-75" style={{ height: `${20 + liveVolume * 80}%` }}></div>
-                         <div className="w-2 bg-purple-500 rounded-full transition-all duration-75 delay-75" style={{ height: `${30 + liveVolume * 60}%` }}></div>
-                         <div className="w-2 bg-pink-500 rounded-full transition-all duration-75 delay-100" style={{ height: `${20 + liveVolume * 90}%` }}></div>
+                         <div className="w-2 bg-brand-500 rounded-full transition-all duration-75" style={{ height: `${20 + liveVolume * 80}%` }}></div>
+                         <div className="w-2 bg-brand-600 rounded-full transition-all duration-75 delay-75" style={{ height: `${30 + liveVolume * 60}%` }}></div>
+                         <div className="w-2 bg-brand-100 rounded-full transition-all duration-75 delay-100" style={{ height: `${20 + liveVolume * 90}%` }}></div>
                       </div>
                    )}
                 </div>
@@ -240,10 +240,10 @@ const Concierge = () => {
          </div>
        ) : (
          <>
-           <div className="flex-1 overflow-y-auto p-4 bg-gray-50 space-y-4 max-h-[400px] no-scrollbar">
+           <div className="flex-1 overflow-y-auto p-4 bg-brand-50/50 space-y-4 max-h-[400px] no-scrollbar">
               {messages.map((msg, idx) => (
                  <div key={idx} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-                    <div className={`px-4 py-3 rounded-2xl text-sm max-w-[85%] ${msg.role === 'user' ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-white border border-gray-200 text-gray-800 rounded-bl-none shadow-sm'}`}>
+                    <div className={`px-4 py-3 rounded-2xl text-sm max-w-[85%] ${msg.role === 'user' ? 'bg-brand-600 text-white rounded-br-none' : 'bg-white border border-brand-100 text-gray-800 rounded-bl-none shadow-sm'}`}>
                        {msg.text}
                     </div>
                     {msg.recommendedIds && msg.recommendedIds.length > 0 && (
@@ -269,8 +269,8 @@ const Concierge = () => {
               ))}
               {loading && (
                  <div className="flex items-start">
-                   <div className="bg-white border border-gray-200 px-4 py-3 rounded-2xl rounded-bl-none shadow-sm">
-                      <Loader2 className="w-4 h-4 animate-spin text-purple-600" />
+                   <div className="bg-white border border-brand-100 px-4 py-3 rounded-2xl rounded-bl-none shadow-sm">
+                      <Loader2 className="w-4 h-4 animate-spin text-brand-600" />
                    </div>
                  </div>
               )}
@@ -279,21 +279,21 @@ const Concierge = () => {
            {attachedImage && (
              <div className="bg-white px-4 pt-2 flex items-center gap-2 animate-in slide-in-from-bottom-2">
                 <div className="relative">
-                  <img src={attachedImage.previewUrl} className="h-12 w-12 rounded-lg object-cover border border-gray-200" alt="Preview" />
+                  <img src={attachedImage.previewUrl} className="h-12 w-12 rounded-lg object-cover border border-brand-100" alt="Preview" />
                   <button onClick={() => setAttachedImage(null)} className="absolute -top-1 -right-1 bg-gray-900 text-white rounded-full p-0.5"><X className="w-2.5 h-2.5" /></button>
                 </div>
                 <span className="text-xs text-gray-500">Image attached</span>
              </div>
            )}
-           <div className="p-3 bg-white border-t border-gray-100 flex gap-2 items-center relative">
-              <button onClick={toggleLiveMode} className="absolute -top-12 right-4 bg-gray-900 text-white p-2 rounded-full shadow-lg hover:scale-110 transition-transform flex items-center gap-1 pl-3 pr-3 text-xs font-bold">
+           <div className="p-3 bg-white border-t border-brand-100 flex gap-2 items-center relative">
+              <button onClick={toggleLiveMode} className="absolute -top-12 right-4 bg-brand-700 text-white p-2 rounded-full shadow-lg hover:scale-110 transition-transform flex items-center gap-1 pl-3 pr-3 text-xs font-bold">
                  <Headphones className="w-3 h-3" /> Live
               </button>
               <input type="file" ref={fileInputRef} onChange={handleImageSelect} accept="image/*" className="hidden" />
-              <button type="button" onClick={() => fileInputRef.current?.click()} className="p-2 text-gray-400 hover:text-brand-600 hover:bg-gray-100 rounded-full transition-colors"><Camera className="w-5 h-5" /></button>
+              <button type="button" onClick={() => fileInputRef.current?.click()} className="p-2 text-gray-400 hover:text-brand-600 hover:bg-brand-50 rounded-full transition-colors"><Camera className="w-5 h-5" /></button>
               <form onSubmit={handleSend} className="flex-1 flex gap-2">
-                <input ref={inputRef} value={input} onChange={(e) => setInput(e.target.value)} onFocus={() => setTimeout(scrollToBottom, 300)} placeholder="Ask anything..." className="flex-1 bg-gray-100 border border-transparent focus:bg-white focus:border-purple-300 rounded-full px-4 py-2 text-sm text-gray-900 outline-none transition-all" />
-                <button type="submit" disabled={(!input.trim() && !attachedImage) || loading} className="p-2 bg-indigo-600 text-white rounded-full disabled:opacity-50 hover:bg-indigo-700 transition-colors">
+                <input ref={inputRef} value={input} onChange={(e) => setInput(e.target.value)} onFocus={() => setTimeout(scrollToBottom, 300)} placeholder="Ask anything..." className="flex-1 bg-brand-50 border border-transparent focus:bg-white focus:border-brand-500 rounded-full px-4 py-2 text-sm text-gray-900 outline-none transition-all" />
+                <button type="submit" disabled={(!input.trim() && !attachedImage) || loading} className="p-2 bg-brand-600 text-white rounded-full disabled:opacity-50 hover:bg-brand-700 transition-colors">
                    <Send className="w-4 h-4" />
                 </button>
               </form>
