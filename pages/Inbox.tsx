@@ -14,7 +14,7 @@ const Inbox = () => {
 
   if (sortedConversations.length === 0) {
     return (
-      <div className="p-4 flex flex-col items-center justify-center h-[70vh] text-center">
+      <div className="p-4 lg:p-8 flex flex-col items-center justify-center h-[70vh] text-center">
         <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
           <MessageCircle className="w-8 h-8 text-gray-400" />
         </div>
@@ -32,11 +32,11 @@ const Inbox = () => {
 
   return (
     <div className="min-h-full bg-white">
-      <div className="p-4 border-b border-gray-100">
+      <div className="p-4 lg:px-8 border-b border-gray-100 lg:hidden">
         <h1 className="text-xl font-bold text-gray-900">Messages</h1>
       </div>
 
-      <div className="divide-y divide-gray-100">
+      <div className="divide-y divide-gray-100 lg:max-w-2xl lg:mx-auto lg:mt-4 lg:border lg:rounded-xl lg:shadow-sm">
         {sortedConversations.map((conv) => {
           const listing = listings.find(l => l.id === conv.listingId);
           if (!listing) return null;

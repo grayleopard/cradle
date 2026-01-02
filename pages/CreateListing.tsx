@@ -324,10 +324,11 @@ const CreateListing = () => {
   };
 
   return (
-    <div className="p-4 min-h-full bg-white pb-20">
+    <div className="p-4 lg:p-8 min-h-full bg-white pb-20">
+      <div className="max-w-2xl mx-auto">
       <div className="flex items-center gap-2 mb-6">
         {step === 2 && <button onClick={() => setStep(1)} className="p-1 hover:bg-gray-100 rounded-full"><ChevronLeft className="w-6 h-6 text-gray-600" /></button>}
-        <h1 className="text-2xl font-bold text-gray-900">{id ? 'Edit Listing' : 'Sell Item'}</h1>
+        <h1 className="text-2xl font-bold text-gray-900 lg:hidden">{id ? 'Edit Listing' : 'Sell Item'}</h1>
       </div>
 
       {step === 1 && (
@@ -515,6 +516,7 @@ const CreateListing = () => {
            </button>
         </form>
       )}
+      </div>
     </div>
   );
 };

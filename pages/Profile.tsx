@@ -46,7 +46,7 @@ const Profile = () => {
 
   return (
     <div className={`min-h-full pb-20 ${isMidnight ? 'bg-black text-white' : isHeirloom ? 'bg-[#F9F6F0]' : 'bg-bg-main'}`}>
-      <div className={`p-6 pb-0 shadow-sm ${isHeirloom ? 'rounded-b-[2.5rem] bg-white border-b border-[#E3D5CA]' : isMidnight ? 'rounded-b-[2rem] bg-gray-900 border-b border-gray-800' : 'rounded-b-[2rem] bg-bg-card'}`}>
+      <div className={`p-6 lg:p-8 pb-0 shadow-sm lg:shadow-none ${isHeirloom ? 'rounded-b-[2.5rem] lg:rounded-none bg-white lg:bg-transparent border-b lg:border-0 border-[#E3D5CA]' : isMidnight ? 'rounded-b-[2rem] lg:rounded-none bg-gray-900 lg:bg-transparent border-b lg:border-0 border-gray-800' : 'rounded-b-[2rem] lg:rounded-none bg-bg-card lg:bg-transparent'}`}>
         <div className="flex justify-between items-start mb-6">
           <h1 className={`font-bold ${isHeirloom ? 'font-serif text-3xl text-[#2F3E2E]' : isMidnight ? 'text-xl font-serif text-white' : 'text-xl text-gray-900'}`}>Profile</h1>
           <div className="flex gap-2">
@@ -197,7 +197,7 @@ const Profile = () => {
         </div>
       </div>
 
-      <div className="p-4">
+      <div className="p-4 lg:px-8">
         {activeTab === 'selling' && (
           <div className="space-y-3 animate-in fade-in duration-300">
              {myListings.length > 0 ? myListings.map(listing => (
@@ -234,7 +234,7 @@ const Profile = () => {
         {activeTab === 'saved' && (
            <div className="animate-in fade-in duration-300">
               {savedListings.length > 0 ? (
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 lg:gap-6">
                   {savedListings.map(listing => <ListingCard key={listing.id} listing={listing} />)}
                 </div>
               ) : (
