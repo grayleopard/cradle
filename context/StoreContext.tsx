@@ -148,6 +148,7 @@ export const StoreProvider = ({ children }: { children?: ReactNode }) => {
     if (!supabase) return;
 
     const fetchRemoteListings = async () => {
+      if (!supabase) return;
       try {
         const { data, error } = await supabase
           .from('listings')
