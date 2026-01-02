@@ -2,8 +2,8 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { SafetyCheckResult, Category, Condition, AgeRange, Listing, Review, DealAnalysis } from "../types";
 
-// Always use the API key from process.env.API_KEY as per guidelines
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Use Vite's import.meta.env for client-side environment variables
+const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_API_KEY });
 
 // New Interface for Auto-fill
 export interface ListingMetadata {

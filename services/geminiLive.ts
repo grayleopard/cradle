@@ -20,8 +20,8 @@ export class CradleLiveService {
   public onStatusChange: (status: 'connected' | 'disconnected' | 'error') => void = () => {};
 
   constructor() {
-    // Always use the API key from process.env.API_KEY as per guidelines
-    this.ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    // Use Vite's import.meta.env for client-side environment variables
+    this.ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_API_KEY });
   }
 
   async connect(listings: Listing[]) {
