@@ -27,7 +27,7 @@ const Concierge = () => {
   // Live Mode State
   const [isLiveMode, setIsLiveMode] = useState(false);
   const [liveVolume, setLiveVolume] = useState(0);
-  const [liveStatus, setLiveStatus] = useState<'disconnected' | 'connecting' | 'connected' | 'error'>('disconnected');
+  const [liveStatus, setLiveStatus] = useState<'disconnected' | 'connecting' | 'connected' | 'error' | 'unavailable'>('disconnected');
   const liveServiceRef = useRef<CradleLiveService | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -148,6 +148,10 @@ const Concierge = () => {
       service.onStatusChange = (status) => {
         setLiveStatus(status);
         if (status === 'error') showToast("Connection failed", 'error');
+        if (status === 'unavailable') {
+          showToast("Voice mode is currently unavailable", 'error');
+          setIsLiveMode(false);
+        }
         if (status === 'disconnected') setIsLiveMode(false);
       };
 
