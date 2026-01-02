@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useStore } from '../context/StoreContext';
 import { useToast } from '../context/ToastContext';
 import { useTheme, Theme } from '../context/ThemeContext';
-import { Search, Filter, X, Bell, Camera, Loader2, Mic, MicOff, Lightbulb, SlidersHorizontal, Palette, Leaf, Baby, ShoppingCart, Shirt, Puzzle, Scissors } from 'lucide-react';
+import { Search, Filter, X, Camera, Loader2, Mic, MicOff, SlidersHorizontal, Palette, Leaf, Baby, ShoppingCart, Shirt, Puzzle, Scissors } from 'lucide-react';
 import ListingCard from '../components/ListingCard';
 import { AgeRange, Category, SavedSearch } from '../types';
 import { generateUUID } from '../utils/uuid';
@@ -187,16 +187,12 @@ const Home = () => {
             : isMidnight ? 'bg-gray-900/90 backdrop-blur-md border-b border-gray-800' : isRetro ? 'bg-white border-b-2 border-black' : 'bg-white shadow-sm'
         }`}>
         
-        {/* Heirloom Header Branding */}
+        {/* Heirloom Header Branding - Mobile only, desktop has top nav */}
         {isHeirloom && (
-           <div className="px-4 mb-3 flex justify-between items-center">
+           <div className="px-4 lg:px-8 mb-3 lg:hidden">
               <div className="flex items-center gap-2">
                  <Scissors className="w-6 h-6 text-[#2F3E2E]" />
                  <h1 className="font-serif text-2xl text-[#2F3E2E] tracking-tight">Heirloom Exchange</h1>
-              </div>
-              <div className="flex gap-2">
-                 <img src={currentUser?.avatarUrl || "https://via.placeholder.com/40"} className="w-8 h-8 rounded-full border border-[#C68E68]" />
-                 <button className="text-[#C68E68]"><Bell className="w-6 h-6" /></button>
               </div>
            </div>
         )}

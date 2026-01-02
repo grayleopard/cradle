@@ -47,8 +47,15 @@ export const Layout = ({ children }: { children?: React.ReactNode }) => {
     return 'Auburn, WA';
   };
 
-  // Navigation items
-  const navItems = [
+  // Desktop nav items (Profile in user dropdown)
+  const desktopNavItems = [
+    { path: '/', icon: Home, label: 'Home' },
+    { path: '/sell', icon: PlusCircle, label: 'Sell', isAction: true },
+    { path: '/messages', icon: MessageCircle, label: 'Messages', badge: unreadCount },
+  ];
+
+  // Mobile nav items (Profile as tab since no dropdown)
+  const mobileNavItems = [
     { path: '/', icon: Home, label: 'Home' },
     { path: '/sell', icon: PlusCircle, label: 'Sell', isAction: true },
     { path: '/messages', icon: MessageCircle, label: 'Messages', badge: unreadCount },
@@ -109,7 +116,7 @@ export const Layout = ({ children }: { children?: React.ReactNode }) => {
 
               {/* Center Navigation */}
               <nav className="flex items-center gap-1">
-                {navItems.map((item) => (
+                {desktopNavItems.map((item) => (
                   <Link
                     key={item.path}
                     to={item.path}
@@ -156,6 +163,13 @@ export const Layout = ({ children }: { children?: React.ReactNode }) => {
                           <p className={`font-medium text-sm ${isMidnight ? 'text-white' : 'text-gray-900'}`}>{currentUser.name}</p>
                           <p className={`text-xs ${isMidnight ? 'text-gray-500' : 'text-gray-500'}`}>{currentUser.location}</p>
                         </div>
+                        <Link
+                          to="/profile"
+                          className={`flex items-center gap-2 px-4 py-2 text-sm ${isMidnight ? 'text-gray-300 hover:bg-gray-800' : 'text-gray-700 hover:bg-gray-50'}`}
+                        >
+                          <UserIcon className="w-4 h-4" />
+                          Profile
+                        </Link>
                         <Link
                           to="/settings/dev"
                           className={`flex items-center gap-2 px-4 py-2 text-sm ${isMidnight ? 'text-gray-300 hover:bg-gray-800' : 'text-gray-700 hover:bg-gray-50'}`}
@@ -237,7 +251,7 @@ export const Layout = ({ children }: { children?: React.ReactNode }) => {
       {/* Mobile Bottom Nav - Hidden on desktop and listing detail */}
       {!isListingDetail && (
         <nav className={`lg:hidden fixed bottom-0 left-0 right-0 px-6 py-3 flex justify-between items-center z-50 border-t ${getMobileNavBg()}`}>
-          {navItems.map((item) => (
+          {mobileNavItems.map((item) => (
             <Link
               key={item.path}
               to={item.path}
