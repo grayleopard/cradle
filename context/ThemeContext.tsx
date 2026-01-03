@@ -1,8 +1,8 @@
 import React, { createContext, useContext, ReactNode } from 'react';
 
-// Simplified theme - always heirloom
-// Other themes can be added back later as a premium feature
-export type Theme = 'heirloom';
+// Pipit Design System v2.0 - Warm, Distinctive, Human
+// Legacy heirloom theme kept for fallback
+export type Theme = 'pipit-v2' | 'heirloom';
 
 interface ThemeContextType {
   theme: Theme;
@@ -12,8 +12,8 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export const ThemeProvider = ({ children }: { children?: ReactNode }) => {
-  // Always use heirloom theme
-  const theme: Theme = 'heirloom';
+  // Use Pipit v2.0 design system
+  const theme: Theme = 'pipit-v2';
 
   // No-op for now - can be expanded later for dark mode or premium themes
   const setTheme = (_newTheme: Theme) => {

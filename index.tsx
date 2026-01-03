@@ -32,16 +32,103 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   render() {
     if (this.state.hasError) {
       return (
-        <div style={{ padding: '20px', fontFamily: 'sans-serif', textAlign: 'center', backgroundColor: '#FEF2F2', height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-          <h1 style={{ color: '#991B1B', marginBottom: '10px' }}>Something went wrong.</h1>
-          <p style={{ maxWidth: '400px', margin: '0 auto', color: '#7F1D1D', fontSize: '14px' }}>
-            {this.state.error?.message || "Unknown error"}
+        <div style={{
+          padding: '24px',
+          fontFamily: 'system-ui, -apple-system, sans-serif',
+          textAlign: 'center',
+          backgroundColor: '#F9F6F0',
+          minHeight: '100vh',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}>
+          {/* Icon */}
+          <div style={{
+            width: '80px',
+            height: '80px',
+            backgroundColor: '#FEE2E2',
+            borderRadius: '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginBottom: '24px'
+          }}>
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <line x1="12" y1="9" x2="12" y2="13"/>
+              <line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+          </div>
+
+          <h1 style={{
+            color: '#2F3E2E',
+            marginBottom: '8px',
+            fontSize: '24px',
+            fontWeight: '700',
+            fontFamily: 'Georgia, serif'
+          }}>
+            Oops! Something went wrong
+          </h1>
+          <p style={{
+            maxWidth: '400px',
+            margin: '0 auto 24px',
+            color: '#5C5C5C',
+            fontSize: '14px',
+            lineHeight: '1.5'
+          }}>
+            We're sorry, but something unexpected happened. Please try refreshing the page.
           </p>
-          <button 
-            onClick={() => { localStorage.clear(); window.location.reload(); }} 
-            style={{ marginTop: '20px', padding: '10px 20px', backgroundColor: '#DC2626', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}
+
+          {/* Action buttons */}
+          <div style={{ display: 'flex', gap: '12px' }}>
+            <button
+              onClick={() => window.location.href = '/'}
+              style={{
+                padding: '12px 24px',
+                backgroundColor: 'white',
+                color: '#2F3E2E',
+                border: '1px solid #E3D5CA',
+                borderRadius: '12px',
+                cursor: 'pointer',
+                fontWeight: '600',
+                fontSize: '14px'
+              }}
+            >
+              Go Home
+            </button>
+            <button
+              onClick={() => window.location.reload()}
+              style={{
+                padding: '12px 24px',
+                backgroundColor: '#C68E68',
+                color: 'white',
+                border: 'none',
+                borderRadius: '12px',
+                cursor: 'pointer',
+                fontWeight: '600',
+                fontSize: '14px'
+              }}
+            >
+              Refresh Page
+            </button>
+          </div>
+
+          {/* Clear data link */}
+          <button
+            onClick={() => { localStorage.clear(); window.location.reload(); }}
+            style={{
+              marginTop: '24px',
+              padding: '8px 16px',
+              backgroundColor: 'transparent',
+              color: '#9CA3AF',
+              border: 'none',
+              cursor: 'pointer',
+              fontSize: '12px',
+              textDecoration: 'underline'
+            }}
           >
-            Clear Data & Reload App
+            Clear local data & reload
           </button>
         </div>
       );

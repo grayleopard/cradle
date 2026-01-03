@@ -45,7 +45,7 @@ const Chat = () => {
   const otherParticipantId = conversation?.participantIds.find(pid => pid !== currentUser?.id);
   const otherUser = otherParticipantId ? getUserById(otherParticipantId) : null;
   
-  const isHeirloom = theme === 'heirloom';
+  const isPipitV2 = theme === 'pipit-v2';
 
   const isMeetupScheduled = activeTransaction?.status === TransactionStatus.MEETUP_AGREED;
 
@@ -220,21 +220,21 @@ const Chat = () => {
   };
 
   return (
-    <div className={`flex flex-col h-[100dvh] pb-[60px] ${isHeirloom ? 'bg-[#F9F6F0]' : 'bg-gray-50'}`}>
-      <div className={`border-b p-3 sticky top-0 z-10 shadow-sm ${isHeirloom ? 'bg-[#F9F6F0] border-[#E3D5CA]' : 'bg-white border-gray-100'}`}>
+    <div className={`flex flex-col h-[100dvh] pb-[60px] ${isPipitV2 ? 'bg-[#FFFCF9]' : 'bg-[#F5EDE6]'}`}>
+      <div className={`border-b p-3 sticky top-0 z-10 shadow-sm ${isPipitV2 ? 'bg-[#FFFCF9] border-[#E8DDD4]' : 'bg-white border-[#F5EDE6]'}`}>
         <div className="flex items-center gap-3 mb-2">
           <button onClick={() => navigate(-1)} className="p-1.5 hover:opacity-70 rounded-full">
-            <ChevronLeft className={`w-5 h-5 ${isHeirloom ? 'text-[#2F3E2E]' : 'text-gray-600'}`} />
+            <ChevronLeft className={`w-5 h-5 ${isPipitV2 ? 'text-[#4A3F37]' : 'text-[#6B5D52]'}`} />
           </button>
-          <img src={listing.images[0]} className="w-10 h-10 rounded-lg object-cover border border-gray-200" alt="Item" />
+          <img src={listing.images[0]} className="w-10 h-10 rounded-lg object-cover border border-[#E8DDD4]" alt="Item" />
           <div className="flex-1 min-w-0">
-             <h2 className={`font-bold text-sm truncate ${isHeirloom ? 'text-[#2F3E2E] font-serif tracking-wide' : 'text-gray-900'}`}>{otherUser?.name || 'User'}</h2>
-             <p className={`text-xs font-medium ${isHeirloom ? 'text-[#C68E68]' : 'text-brand-600'}`}>
+             <h2 className={`font-bold text-sm truncate ${isPipitV2 ? 'text-[#4A3F37] font-serif tracking-wide' : 'text-gray-900'}`}>{otherUser?.name || 'User'}</h2>
+             <p className={`text-xs font-medium ${isPipitV2 ? 'text-[#2D9B8C]' : 'text-brand-600'}`}>
                {listing.title} • {listing.isSold ? <span className="text-red-500 font-bold">SOLD</span> : `$${listing.price}`}
              </p>
           </div>
           {isSeller && !listing.isSold && !activeTransaction && (
-            <button onClick={handleMarkAsSold} className={`text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1 transition-colors ${isHeirloom ? 'bg-[#C68E68]/10 text-[#C68E68]' : 'bg-brand-50 text-brand-700 hover:bg-brand-100'}`}>
+            <button onClick={handleMarkAsSold} className={`text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1 transition-colors ${isPipitV2 ? 'bg-[#2D9B8C]/10 text-[#2D9B8C]' : 'bg-brand-50 text-brand-700 hover:bg-brand-100'}`}>
               <CheckCircle className="w-3 h-3" /> Mark Sold
             </button>
           )}
@@ -242,7 +242,7 @@ const Chat = () => {
         
         {/* Persistent "Scheduled" Card */}
         {activeTransaction && isMeetupScheduled && (
-          <div className={`p-3 rounded-xl shadow-md animate-in slide-in-from-top-2 ${isHeirloom ? 'bg-[#2F3E2E] text-white' : 'bg-gradient-to-r from-brand-600 to-brand-700 text-white'}`}>
+          <div className={`p-3 rounded-xl shadow-md animate-in slide-in-from-top-2 ${isPipitV2 ? 'bg-[#4A3F37] text-white' : 'bg-gradient-to-r from-brand-600 to-brand-700 text-white'}`}>
              <div className="flex justify-between items-start mb-2">
                 <div className="flex items-center gap-2 font-bold text-sm">
                    <CalendarCheck className="w-4 h-4 opacity-80" /> 
@@ -264,7 +264,7 @@ const Chat = () => {
 
         {/* Transaction Link */}
         {activeTransaction && !isMeetupScheduled && (
-          <div onClick={() => navigate(`/transaction/${activeTransaction.id}`)} className={`p-2 rounded-lg flex justify-between items-center cursor-pointer transition-colors ${isHeirloom ? 'bg-white border border-[#E3D5CA] text-[#2F3E2E]' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
+          <div onClick={() => navigate(`/transaction/${activeTransaction.id}`)} className={`p-2 rounded-lg flex justify-between items-center cursor-pointer transition-colors ${isPipitV2 ? 'bg-white border border-[#E8DDD4] text-[#4A3F37]' : 'bg-[#E8DDD4] text-[#4A3F37] hover:bg-gray-200'}`}>
             <div className="flex items-center gap-2"><ShoppingBag className="w-4 h-4" /><span className="text-xs font-bold">Transaction Open</span></div>
             <span className="text-xs underline">View</span>
           </div>
@@ -275,7 +275,7 @@ const Chat = () => {
         
         {/* AI Proposal Banner */}
         {detectedPlan && !isMeetupScheduled && (
-           <div className={`mx-auto max-w-sm border rounded-xl p-3 shadow-sm animate-in zoom-in duration-300 relative ${isHeirloom ? 'bg-white border-[#C68E68] text-[#2F3E2E]' : 'bg-indigo-50 border-indigo-100 text-indigo-800'}`}>
+           <div className={`mx-auto max-w-sm border rounded-xl p-3 shadow-sm animate-in zoom-in duration-300 relative ${isPipitV2 ? 'bg-white border-[#2D9B8C] text-[#4A3F37]' : 'bg-indigo-50 border-indigo-100 text-indigo-800'}`}>
               <button onClick={() => setDetectedPlan(null)} className="absolute top-2 right-2 opacity-50 hover:opacity-100"><X className="w-3 h-3" /></button>
               <div className="flex items-center gap-2 font-bold text-sm mb-1">
                  <Sparkles className="w-4 h-4" /> Proposed Plan
@@ -287,7 +287,7 @@ const Chat = () => {
                  <div>📍 {detectedPlan.location}</div>
                  <div>⏰ {detectedPlan.dateTime}</div>
               </div>
-              <button onClick={handleConfirmPlan} className={`w-full py-2 rounded-lg text-xs font-bold transition-colors ${isHeirloom ? 'bg-[#C68E68] text-white' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}>
+              <button onClick={handleConfirmPlan} className={`w-full py-2 rounded-lg text-xs font-bold transition-colors ${isPipitV2 ? 'bg-[#2D9B8C] text-white' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}>
                  Confirm Meetup
               </button>
            </div>
@@ -303,12 +303,12 @@ const Chat = () => {
           </div>
         )}
 
-        <div className={`border rounded-lg p-3 flex gap-3 text-xs mb-6 mx-auto max-w-sm ${isHeirloom ? 'bg-white border-[#E3D5CA] text-[#5C5C5C]' : 'bg-blue-50 border-blue-100 text-blue-800'}`}>
-          <Shield className={`w-5 h-5 flex-shrink-0 ${isHeirloom ? 'text-[#C68E68]' : 'text-blue-500'}`} />
+        <div className={`border rounded-lg p-3 flex gap-3 text-xs mb-6 mx-auto max-w-sm ${isPipitV2 ? 'bg-white border-[#E8DDD4] text-[#6B5D52]' : 'bg-blue-50 border-blue-100 text-blue-800'}`}>
+          <Shield className={`w-5 h-5 flex-shrink-0 ${isPipitV2 ? 'text-[#2D9B8C]' : 'text-blue-500'}`} />
           <p>Keep conversations on Pipit until you meet. Suggested meetup: <strong>Auburn SuperMall</strong>.</p>
         </div>
 
-        {messages.length === 0 && <div className="text-center text-gray-400 text-xs py-4">Start the conversation...</div>}
+        {messages.length === 0 && <div className="text-center text-[#B8A395] text-xs py-4">Start the conversation...</div>}
 
         {messages.map((msg) => {
           const isMe = msg.senderId === currentUser?.id;
@@ -316,8 +316,8 @@ const Chat = () => {
             <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
               <div className={`max-w-[75%] px-4 py-2.5 rounded-2xl text-sm shadow-sm 
                   ${isMe 
-                    ? (isHeirloom ? 'bg-[#C68E68] text-white rounded-br-none' : 'bg-brand-600 text-white rounded-br-none') 
-                    : (isHeirloom ? 'bg-white border border-[#E3D5CA] text-[#2F3E2E] rounded-bl-none' : 'bg-white border border-gray-100 text-gray-800 rounded-bl-none')
+                    ? (isPipitV2 ? 'bg-[#2D9B8C] text-white rounded-br-none' : 'bg-brand-600 text-white rounded-br-none') 
+                    : (isPipitV2 ? 'bg-white border border-[#E8DDD4] text-[#4A3F37] rounded-bl-none' : 'bg-white border border-[#F5EDE6] text-gray-800 rounded-bl-none')
                   }`}>
                 {msg.text}
               </div>
@@ -337,7 +337,7 @@ const Chat = () => {
                    <button key={star} onClick={() => setReviewRating(star)}><Star className={`w-8 h-8 ${star <= reviewRating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`} /></button>
                  ))}
               </div>
-              <textarea value={reviewComment} onChange={(e) => setReviewComment(e.target.value)} placeholder="Share details..." className="w-full p-3 bg-gray-50 rounded-xl mb-4 text-sm" rows={3} />
+              <textarea value={reviewComment} onChange={(e) => setReviewComment(e.target.value)} placeholder="Share details..." className="w-full p-3 bg-[#F5EDE6] rounded-xl mb-4 text-sm" rows={3} />
               <button onClick={handleSubmitReview} className="w-full py-3 bg-black text-white rounded-xl font-bold">Submit Review</button>
            </div>
         </div>
@@ -349,14 +349,14 @@ const Chat = () => {
            <div className="bg-white w-full max-w-md rounded-t-3xl sm:rounded-2xl p-6 animate-in slide-in-from-bottom-10 h-[80vh] flex flex-col">
               <div className="flex justify-between items-center mb-4">
                  <h3 className="text-lg font-bold text-gray-900">Create Bundle Offer</h3>
-                 <button onClick={() => setShowBundleModal(false)} className="p-1 hover:bg-gray-100 rounded-full"><X className="w-5 h-5 text-gray-500" /></button>
+                 <button onClick={() => setShowBundleModal(false)} className="p-1 hover:bg-[#E8DDD4] rounded-full"><X className="w-5 h-5 text-[#9A8578]" /></button>
               </div>
               
               <div className="flex-1 overflow-y-auto space-y-3 mb-4 no-scrollbar">
-                 <p className="text-xs text-gray-500 mb-2">Select items to add to the <strong>{listing.title}</strong>:</p>
+                 <p className="text-xs text-[#9A8578] mb-2">Select items to add to the <strong>{listing.title}</strong>:</p>
                  
                  {sellerOtherListings.length === 0 ? (
-                    <div className="text-center py-10 text-gray-400">
+                    <div className="text-center py-10 text-[#B8A395]">
                        <ShoppingBag className="w-10 h-10 mx-auto mb-2 opacity-30" />
                        <p className="text-sm">Seller has no other items.</p>
                     </div>
@@ -365,29 +365,29 @@ const Chat = () => {
                        <div 
                          key={item.id} 
                          onClick={() => handleToggleBundleItem(item.id)}
-                         className={`flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer ${selectedBundleItems.includes(item.id) ? 'border-brand-500 bg-brand-50' : 'border-gray-200 hover:border-brand-200'}`}
+                         className={`flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer ${selectedBundleItems.includes(item.id) ? 'border-brand-500 bg-brand-50' : 'border-[#E8DDD4] hover:border-brand-200'}`}
                        >
                           <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${selectedBundleItems.includes(item.id) ? 'bg-brand-500 border-brand-500' : 'border-gray-300'}`}>
                              {selectedBundleItems.includes(item.id) && <CheckCircle className="w-3.5 h-3.5 text-white" />}
                           </div>
-                          <img src={item.images[0]} className="w-12 h-12 rounded-lg object-cover bg-gray-100" />
+                          <img src={item.images[0]} className="w-12 h-12 rounded-lg object-cover bg-[#E8DDD4]" />
                           <div className="flex-1">
                              <div className="text-sm font-bold text-gray-900 line-clamp-1">{item.title}</div>
-                             <div className="text-xs text-gray-500">${item.price}</div>
+                             <div className="text-xs text-[#9A8578]">${item.price}</div>
                           </div>
                        </div>
                     ))
                  )}
               </div>
 
-              <div className="border-t border-gray-100 pt-4">
+              <div className="border-t border-[#F5EDE6] pt-4">
                  <div className="flex justify-between items-center mb-4">
-                    <span className="text-sm text-gray-600">Total Items:</span>
+                    <span className="text-sm text-[#6B5D52]">Total Items:</span>
                     <span className="font-bold text-gray-900">{selectedBundleItems.length + 1}</span>
                  </div>
                  
-                 <div className="bg-gray-50 p-3 rounded-xl flex items-center gap-2 mb-4 border border-gray-200 focus-within:ring-2 focus-within:ring-brand-500 focus-within:border-brand-500">
-                    <DollarSign className="w-5 h-5 text-gray-400" />
+                 <div className="bg-[#F5EDE6] p-3 rounded-xl flex items-center gap-2 mb-4 border border-[#E8DDD4] focus-within:ring-2 focus-within:ring-brand-500 focus-within:border-brand-500">
+                    <DollarSign className="w-5 h-5 text-[#B8A395]" />
                     <input 
                       type="number" 
                       placeholder="Your Offer Price (Optional)" 
@@ -411,8 +411,8 @@ const Chat = () => {
 
       {showMeetupOptions && (
         <div className="px-4 pb-2">
-          <div className="bg-white border border-gray-200 rounded-xl shadow-lg p-3 space-y-2">
-             <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-1">Suggest Safe Meetup</div>
+          <div className="bg-white border border-[#E8DDD4] rounded-xl shadow-lg p-3 space-y-2">
+             <div className="text-xs font-semibold text-[#9A8578] uppercase tracking-wide px-1">Suggest Safe Meetup</div>
              <button onClick={() => handleSuggestMeetup("Auburn Police Station (Safe Zone)")} className="w-full text-left flex items-center gap-2 p-2 hover:bg-blue-50 rounded-lg"><MapPin className="w-4 h-4 text-blue-500" /><span className="text-sm font-medium text-gray-800">Auburn Police Station</span></button>
              <button onClick={() => handleSuggestMeetup("Auburn SuperMall (Outlet Collection)")} className="w-full text-left flex items-center gap-2 p-2 hover:bg-blue-50 rounded-lg"><MapPin className="w-4 h-4 text-blue-500" /><span className="text-sm font-medium text-gray-800">Auburn SuperMall</span></button>
           </div>
@@ -422,12 +422,12 @@ const Chat = () => {
       {/* Smart Replies */}
       {smartReplies.length > 0 && (
          <div className="px-4 pb-2 overflow-x-auto no-scrollbar flex gap-2 animate-in slide-in-from-bottom-2">
-            <div className={`flex items-center p-1.5 rounded-full ${isHeirloom ? 'bg-[#E3D5CA] text-[#B07D5B]' : 'bg-purple-50 text-purple-600'}`}><Sparkles className="w-3 h-3" /></div>
+            <div className={`flex items-center p-1.5 rounded-full ${isPipitV2 ? 'bg-[#E8DDD4] text-[#247A6F]' : 'bg-purple-50 text-purple-600'}`}><Sparkles className="w-3 h-3" /></div>
             {smartReplies.map((reply, i) => (
                <button 
                   key={i} 
                   onClick={() => handleSend(null as any, reply)}
-                  className={`whitespace-nowrap px-3 py-1.5 rounded-full text-xs transition-colors shadow-sm ${isHeirloom ? 'bg-white text-[#2F3E2E] border border-[#E3D5CA] hover:bg-[#F9F6F0]' : 'bg-white border border-purple-200 text-purple-700 hover:bg-purple-50'}`}
+                  className={`whitespace-nowrap px-3 py-1.5 rounded-full text-xs transition-colors shadow-sm ${isPipitV2 ? 'bg-white text-[#4A3F37] border border-[#E8DDD4] hover:bg-[#FFFCF9]' : 'bg-white border border-purple-200 text-purple-700 hover:bg-purple-50'}`}
                >
                   {reply}
                </button>
@@ -435,13 +435,13 @@ const Chat = () => {
          </div>
       )}
 
-      <form onSubmit={handleSend} className={`p-3 border-t flex gap-2 items-center bg-white border-gray-100 sticky bottom-0 z-20`}>
-        <button type="button" onClick={() => setShowMeetupOptions(!showMeetupOptions)} className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${showMeetupOptions ? (isHeirloom ? 'bg-[#C68E68] text-white' : 'bg-brand-100 text-brand-600') : (isHeirloom ? 'bg-white border border-[#E3D5CA] text-[#C68E68]' : 'bg-gray-100 text-gray-500')}`}><MapPin className="w-5 h-5" /></button>
+      <form onSubmit={handleSend} className={`p-3 border-t flex gap-2 items-center bg-white border-[#F5EDE6] sticky bottom-0 z-20`}>
+        <button type="button" onClick={() => setShowMeetupOptions(!showMeetupOptions)} className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${showMeetupOptions ? (isPipitV2 ? 'bg-[#2D9B8C] text-white' : 'bg-brand-100 text-brand-600') : (isPipitV2 ? 'bg-white border border-[#E8DDD4] text-[#2D9B8C]' : 'bg-[#E8DDD4] text-[#9A8578]')}`}><MapPin className="w-5 h-5" /></button>
         {!isSeller && (
             <button 
               type="button" 
               onClick={() => setShowBundleModal(true)} 
-              className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${isHeirloom ? 'bg-white border border-[#E3D5CA] text-[#C68E68]' : 'bg-gray-100 text-gray-500 hover:bg-brand-100 hover:text-brand-600'}`} 
+              className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${isPipitV2 ? 'bg-white border border-[#E8DDD4] text-[#2D9B8C]' : 'bg-[#E8DDD4] text-[#9A8578] hover:bg-brand-100 hover:text-brand-600'}`} 
               title="Request Bundle"
             >
               <PackagePlus className="w-5 h-5" />
@@ -454,9 +454,9 @@ const Chat = () => {
           onFocus={handleInputFocus}
           onChange={(e) => setInputText(e.target.value)} 
           placeholder="Type a message..." 
-          className={`flex-1 rounded-full px-4 py-2.5 text-sm outline-none transition-all ${isHeirloom ? 'bg-white border border-[#E3D5CA] text-[#2F3E2E] placeholder:text-[#B07D5B]/50 focus:ring-1 focus:ring-[#C68E68]' : 'bg-gray-50 border border-gray-200 text-gray-900 placeholder:text-gray-400'}`} 
+          className={`flex-1 rounded-full px-4 py-2.5 text-sm outline-none transition-all ${isPipitV2 ? 'bg-white border border-[#E8DDD4] text-[#4A3F37] placeholder:text-[#247A6F]/50 focus:ring-1 focus:ring-[#2D9B8C]' : 'bg-[#F5EDE6] border border-[#E8DDD4] text-gray-900 placeholder:text-[#B8A395]'}`} 
         />
-        <button type="submit" disabled={!inputText.trim()} className={`w-10 h-10 rounded-full flex items-center justify-center disabled:opacity-50 ${isHeirloom ? 'bg-[#C68E68] text-white' : 'bg-brand-600 text-white'}`}><Send className="w-4 h-4 ml-0.5" /></button>
+        <button type="submit" disabled={!inputText.trim()} className={`w-10 h-10 rounded-full flex items-center justify-center disabled:opacity-50 ${isPipitV2 ? 'bg-[#2D9B8C] text-white' : 'bg-brand-600 text-white'}`}><Send className="w-4 h-4 ml-0.5" /></button>
       </form>
     </div>
   );

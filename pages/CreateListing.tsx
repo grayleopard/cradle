@@ -203,17 +203,18 @@ const CreateListing = () => {
   // Run full Deal Analysis when price is set
   const handlePriceBlur = async () => {
     if (!formData.price || !formData.title) return;
-    
+
     setCheckingPrice(true);
     try {
       const analysis = await analyzeDeal(
-        formData.title, 
-        Number(formData.price), 
-        formData.condition, 
+        formData.title,
+        Number(formData.price),
+        formData.condition,
         formData.originalPrice ? Number(formData.originalPrice) : undefined
       );
-      
-      if (analysis) {
+
+      // Only store successful analysis results, not errors
+      if (analysis && !('error' in analysis)) {
         setFormData(prev => ({ ...prev, dealAnalysis: analysis }));
       }
     } catch (e) {

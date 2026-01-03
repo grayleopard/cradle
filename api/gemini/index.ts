@@ -1,7 +1,46 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { GoogleGenAI, Type } from "@google/genai";
+import { createClient } from '@supabase/supabase-js';
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
+// Supabase client for caching
+const supabaseUrl = process.env.VITE_SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
+
+// Cache TTL: 14 days in milliseconds
+const CACHE_TTL_MS = 14 * 24 * 60 * 60 * 1000;
+
+// Normalize title for cache key (lowercase, trim, remove special chars)
+function normalizeCacheKey(title: string, condition: string): string {
+  const normalizedTitle = title.toLowerCase().trim().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ');
+  const normalizedCondition = condition.toLowerCase().trim();
+  return `${normalizedTitle}|${normalizedCondition}`;
+}
+
+// Calculate deal score based on savings and condition
+function calculateDealScore(savingsPercentage: number, condition: string): number {
+  const conditionMultiplier: Record<string, number> = {
+    'like new': 1.0,
+    'excellent': 0.9,
+    'very good': 0.8,
+    'good': 0.7,
+    'fair': 0.6
+  };
+  const multiplier = conditionMultiplier[condition.toLowerCase()] || 0.75;
+  const baseScore = Math.min(10, Math.max(1, Math.round(savingsPercentage / 10 * multiplier + 3)));
+  return baseScore;
+}
+
+// Get verdict from deal score
+function getVerdict(score: number): string {
+  if (score >= 9) return "Great Deal";
+  if (score >= 7) return "Good Deal";
+  if (score >= 5) return "Fair Price";
+  if (score >= 3) return "Slightly High";
+  return "Overpriced";
+}
 
 // CORS headers for client requests
 const corsHeaders = {
@@ -76,7 +115,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 // --- Gemini Functions (server-side) ---
 
 async function processVoiceCommand({ base64Audio, mimeType }: { base64Audio: string; mimeType: string }) {
-  const model = "gemini-2.5-flash-preview-native-audio-dialog";
+  const model = "gemini-2.0-flash";
   const textPrompt = `
     You are a search assistant for a baby gear marketplace.
     Listen to the user's voice command and extract their search filters.
@@ -120,7 +159,7 @@ async function processVoiceCommand({ base64Audio, mimeType }: { base64Audio: str
 }
 
 async function generateListingMetadata({ base64Image, mimeType = 'image/jpeg' }: { base64Image: string; mimeType?: string }) {
-  const model = "gemini-2.5-flash-preview-05-20";
+  const model = "gemini-2.0-flash";
   const textPrompt = `
     You are an expert reseller of baby gear. Analyze this image and create a listing for a marketplace.
 
@@ -172,7 +211,7 @@ async function generateListingMetadata({ base64Image, mimeType = 'image/jpeg' }:
 }
 
 async function identifyItemFromImage({ base64Image, mimeType = 'image/jpeg' }: { base64Image: string; mimeType?: string }) {
-  const model = "gemini-2.5-flash-preview-05-20";
+  const model = "gemini-2.0-flash";
   const textPrompt = `
     Identify the main item in this image for a search query.
     1. Return a short, precise 'searchQuery' (e.g. "Uppababy Vista" or "Ergobaby 360"). Max 3 words.
@@ -209,7 +248,7 @@ async function identifyItemFromImage({ base64Image, mimeType = 'image/jpeg' }: {
 }
 
 async function checkProductSafety({ title, description, base64Image, mimeType = 'image/jpeg' }: { title: string; description: string; base64Image?: string; mimeType?: string }) {
-  const model = "gemini-2.5-pro-preview-05-06";
+  const model = "gemini-2.0-flash";
   const textPrompt = `
     You are a Product Safety Expert for baby and children's items.
 
@@ -280,94 +319,169 @@ async function checkProductSafety({ title, description, base64Image, mimeType = 
 }
 
 async function analyzeDeal({ title, price, condition, originalPrice }: { title: string; price: number; condition: string; originalPrice?: number }) {
-  const model = "gemini-2.5-flash-preview-05-20";
-  const useSearch = !originalPrice;
+  // Use Groq for deal analysis - fast and cost-effective
+  const GROQ_API_KEY = process.env.GROQ_API_KEY;
 
-  const textPrompt = useSearch ? `
-    You are a pricing expert for used baby gear.
-    1. Use Google Search to find the CURRENT RETAIL price (New) for: "${title}".
-    2. Compare the used price ($${price}) in "${condition}" condition to the new retail price.
-    3. Calculate the savings and determine a 'Deal Score' from 1-10 (10 being an amazing deal).
-    4. Provide a short verdict and explanation.
-
-    JSON Schema:
-    {
-      "estimatedRetailPrice": number,
-      "savingsPercentage": number (0-100),
-      "dealScore": number (1-10),
-      "verdict": "string (e.g. Great Deal, Fair Price, Overpriced)",
-      "explanation": "string (max 20 words)",
-      "retailSource": "string (e.g. Amazon, Target, Manufacturer)"
-    }
-  ` : `
-    You are a pricing expert for used baby gear.
-    The seller states the original retail price was $${originalPrice}.
-    The used price is $${price} in "${condition}" condition.
-
-    1. Verify if $${originalPrice} seems accurate for "${title}". If it's wildly inflated, estimate the real retail.
-    2. Calculate the savings and depreciation.
-    3. Determine a 'Deal Score' from 1-10 based on the condition.
-    4. Provide a short verdict.
-
-    JSON Schema:
-    {
-      "estimatedRetailPrice": number,
-      "savingsPercentage": number (0-100),
-      "dealScore": number (1-10),
-      "verdict": "string (e.g. Great Deal, Fair Price, Overpriced)",
-      "explanation": "string (max 20 words)",
-      "retailSource": "string (User Provided)"
-    }
-  `;
-
-  const config: any = {
-    responseMimeType: "application/json",
-    responseSchema: {
-      type: Type.OBJECT,
-      properties: {
-        estimatedRetailPrice: { type: Type.NUMBER },
-        savingsPercentage: { type: Type.NUMBER },
-        dealScore: { type: Type.NUMBER },
-        verdict: { type: Type.STRING },
-        explanation: { type: Type.STRING },
-        retailSource: { type: Type.STRING }
-      },
-      required: ["estimatedRetailPrice", "dealScore", "verdict"]
-    }
-  };
-
-  if (useSearch) {
-    config.tools = [{ googleSearch: {} }];
+  if (!GROQ_API_KEY) {
+    throw new Error("GROQ_API_KEY not configured");
   }
 
-  const response = await ai.models.generateContent({
-    model,
-    contents: textPrompt,
-    config
+  // Check cache first (by normalized title + condition)
+  const cacheKey = normalizeCacheKey(title, condition);
+
+  if (supabase) {
+    try {
+      const { data: cached } = await supabase
+        .from('deal_analysis_cache')
+        .select('*')
+        .eq('cache_key', cacheKey)
+        .single();
+
+      if (cached && cached.analysis) {
+        const cacheAge = Date.now() - new Date(cached.created_at).getTime();
+        if (cacheAge < CACHE_TTL_MS) {
+          console.log(`Cache hit for: ${cacheKey}`);
+          // Recalculate savings based on actual price (cached retail price is reused)
+          const cachedAnalysis = cached.analysis;
+          const savingsPercentage = Math.round(((cachedAnalysis.estimatedRetailPrice - price) / cachedAnalysis.estimatedRetailPrice) * 100);
+          const dealScore = calculateDealScore(savingsPercentage, condition);
+          return {
+            ...cachedAnalysis,
+            savingsPercentage: Math.max(0, savingsPercentage),
+            dealScore,
+            verdict: getVerdict(dealScore),
+            fromCache: true
+          };
+        }
+      }
+    } catch (e) {
+      // Cache miss or table doesn't exist - continue to API call
+      console.log('Cache miss, calling Groq API');
+    }
+  }
+
+  const systemPrompt = `You are a pricing expert for used baby and kids gear. You have extensive knowledge of retail prices for items like strollers, car seats, cribs, toys, bikes, and other children's products from brands like UPPAbaby, Bugaboo, Graco, Fisher-Price, Ergobaby, and more.
+
+Your task is to analyze if a used item is a good deal by:
+1. Estimating the typical NEW retail price for this item
+2. Calculating the savings percentage
+3. Giving a deal score from 1-10 (10 = amazing deal)
+4. Providing a short verdict
+
+Consider condition when scoring:
+- "Like New" items should be 40-60% of retail to be a good deal
+- "Excellent" items should be 30-50% of retail
+- "Very Good" items should be 25-40% of retail
+- "Good" items should be 20-35% of retail
+- "Fair" items should be under 25% of retail
+
+Always respond with valid JSON only.`;
+
+  const userPrompt = originalPrice
+    ? `Analyze this deal:
+- Item: "${title}"
+- Asking Price: $${price}
+- Condition: ${condition}
+- Seller's claimed retail price: $${originalPrice}
+
+Verify if the claimed retail price is accurate. If it seems inflated, use your estimate instead.
+
+Respond with JSON:
+{
+  "estimatedRetailPrice": <number>,
+  "savingsPercentage": <number 0-100>,
+  "dealScore": <number 1-10>,
+  "verdict": "<Great Deal | Good Deal | Fair Price | Slightly High | Overpriced>",
+  "explanation": "<max 15 words>",
+  "retailSource": "Estimated"
+}`
+    : `Analyze this deal:
+- Item: "${title}"
+- Asking Price: $${price}
+- Condition: ${condition}
+
+Estimate the typical NEW retail price for this item based on your knowledge.
+
+Respond with JSON:
+{
+  "estimatedRetailPrice": <number>,
+  "savingsPercentage": <number 0-100>,
+  "dealScore": <number 1-10>,
+  "verdict": "<Great Deal | Good Deal | Fair Price | Slightly High | Overpriced>",
+  "explanation": "<max 15 words>",
+  "retailSource": "Estimated"
+}`;
+
+  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${GROQ_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'llama-3.3-70b-versatile',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ],
+      temperature: 0.3,
+      max_tokens: 300,
+      response_format: { type: 'json_object' }
+    })
   });
 
-  const text = response.text;
-  if (!text) return null;
-
-  const result = JSON.parse(text);
-
-  // Extract grounding sources
-  const sources: { title: string; uri: string }[] = [];
-  if (response.candidates?.[0]?.groundingMetadata?.groundingChunks) {
-    response.candidates[0].groundingMetadata.groundingChunks.forEach((chunk: any) => {
-      if (chunk.web?.uri && chunk.web?.title) {
-        sources.push({ title: chunk.web.title, uri: chunk.web.uri });
-      }
-    });
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.error?.message || `Groq API error: ${response.status}`);
   }
 
-  return { ...result, sources: sources.filter((v, i, a) => a.findIndex(t => t.uri === v.uri) === i) };
+  const data = await response.json();
+  const content = data.choices?.[0]?.message?.content;
+
+  if (!content) {
+    throw new Error("No response from Groq");
+  }
+
+  const result = JSON.parse(content);
+
+  // Ensure all required fields exist
+  const analysisResult = {
+    estimatedRetailPrice: result.estimatedRetailPrice || 0,
+    savingsPercentage: result.savingsPercentage || 0,
+    dealScore: result.dealScore || 5,
+    verdict: result.verdict || "Unknown",
+    explanation: result.explanation || "",
+    retailSource: result.retailSource || "Estimated",
+    sources: [] // Groq doesn't have web search, so no sources
+  };
+
+  // Write to cache for future lookups (fire and forget)
+  if (supabase && analysisResult.estimatedRetailPrice > 0) {
+    (async () => {
+      try {
+        await supabase
+          .from('deal_analysis_cache')
+          .upsert({
+            cache_key: cacheKey,
+            title: title,
+            condition: condition,
+            analysis: analysisResult,
+            created_at: new Date().toISOString()
+          }, { onConflict: 'cache_key' });
+        console.log(`Cached analysis for: ${cacheKey}`);
+      } catch (e) {
+        console.error('Cache write failed:', e);
+      }
+    })();
+  }
+
+  return analysisResult;
 }
 
 async function compareListings({ listings }: { listings: any[] }) {
   if (listings.length < 2) return null;
 
-  const model = "gemini-2.5-pro-preview-05-06";
+  const model = "gemini-2.0-flash";
   const listingsSummary = listings.map((l: any) =>
     `ID: ${l.id}, Title: ${l.title}, Price: $${l.price}, Condition: ${l.condition}, Description: ${l.description}, Age: ${l.ageRange}`
   ).join("\n---\n");
@@ -434,7 +548,7 @@ async function compareListings({ listings }: { listings: any[] }) {
 }
 
 async function askConcierge({ history, userMessage, listings, image }: { history: any[]; userMessage: string; listings: any[]; image?: { base64: string; mimeType: string } }) {
-  const model = "gemini-2.5-flash-preview-05-20";
+  const model = "gemini-2.0-flash";
 
   const inventory = listings
     .filter((l: any) => !l.isSold)
@@ -490,7 +604,7 @@ async function askConcierge({ history, userMessage, listings, image }: { history
 }
 
 async function generateSmartReplies({ myRole, otherUserName, itemTitle, itemPrice, lastMessageText, fullHistory }: any) {
-  const model = "gemini-2.5-flash-preview-05-20";
+  const model = "gemini-2.0-flash";
   const historyText = fullHistory.slice(-5).map((m: any) => m.text).join('\n');
 
   const textPrompt = `
@@ -523,7 +637,7 @@ async function generateSmartReplies({ myRole, otherUserName, itemTitle, itemPric
 }
 
 async function optimizeListingDescription({ draftDescription, title, category }: { draftDescription: string; title: string; category: string }) {
-  const model = "gemini-2.5-flash-preview-05-20";
+  const model = "gemini-2.0-flash";
   const textPrompt = `
     I am a parent selling a "${title}" (${category}).
     My draft description is: "${draftDescription}"
@@ -547,7 +661,7 @@ async function optimizeListingDescription({ draftDescription, title, category }:
 }
 
 async function generateInspectionChecklist({ title, category }: { title: string; category: string }) {
-  const model = "gemini-2.5-flash-preview-05-20";
+  const model = "gemini-2.0-flash";
   const textPrompt = `
     I am buying a used "${title}" (Category: ${category}) in person.
     Generate 4 specific, short inspection checks I should perform to ensure it is safe and functional.
@@ -576,7 +690,7 @@ async function generateInspectionChecklist({ title, category }: { title: string;
 async function summarizeUserReputation({ reviews, sellerName, isVerified, soldCount }: { reviews: any[]; sellerName: string; isVerified: boolean; soldCount: number }) {
   if (reviews.length === 0 && soldCount === 0) return null;
 
-  const model = "gemini-2.5-flash-preview-05-20";
+  const model = "gemini-2.0-flash";
   const reviewTexts = reviews.map((r: any) => `"${r.comment}" (${r.rating}/5)`).join("\n");
 
   const textPrompt = `
@@ -607,7 +721,7 @@ async function summarizeUserReputation({ reviews, sellerName, isVerified, soldCo
 async function extractMeetingDetails({ messages }: { messages: any[] }) {
   if (messages.length < 2) return null;
 
-  const model = "gemini-2.5-flash-preview-05-20";
+  const model = "gemini-2.0-flash";
   const history = messages.slice(-10).map((m: any) => m.text).join("\n");
 
   const textPrompt = `

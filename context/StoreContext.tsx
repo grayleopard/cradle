@@ -1,9 +1,9 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
-import { Listing, User, Conversation, Message, Review, Transaction, TransactionStatus, Report, SavedSearch } from '../types';
-import { MOCK_LISTINGS, MOCK_USERS } from '../constants';
+import { Listing, User, Conversation, Message, Review, Transaction, TransactionStatus, Report, SavedSearch, Offer, OfferStatus, Charity, DonationOption } from '../types';
+import { MOCK_LISTINGS, MOCK_USERS, DEFAULT_CHARITY } from '../constants';
 import { calculateDistance, ZIP_COORDINATES } from '../utils/locationHelpers';
-import { supabase } from '../services/supabase';
+import { supabase, getSession, getUserProfile, signOut as supabaseSignOut } from '../services/supabase';
 import { generateUUID } from '../utils/uuid';
 
 interface StoreContextType {
@@ -14,6 +14,7 @@ interface StoreContextType {
   reviews: Review[];
   transactions: Transaction[];
   reports: Report[];
+  offers: Offer[];
   userLocation: { lat: number; lng: number } | null;
   locationStatus: 'idle' | 'locating' | 'located' | 'error';
   isLoading: boolean;
@@ -23,10 +24,11 @@ interface StoreContextType {
   toggleCompare: (id: string) => void;
   clearCompare: () => void;
 
-  login: (user: User) => void;
+  login: (user: User, referralCodeUsed?: string) => void;
   logout: () => void;
   updateUser: (user: User) => void;
   upgradeToPremium: () => void;
+  useReferralCredit: (amount: number) => Promise<number>;
 
   // Listings
   addListing: (listing: Listing) => void;
@@ -55,11 +57,25 @@ interface StoreContextType {
   addReview: (review: Review) => void;
   getReviewsByUserId: (userId: string) => Review[];
 
+  // Offers
+  createOffer: (listingId: string, amount: number, message?: string) => Promise<string>;
+  respondToOffer: (offerId: string, response: 'accept' | 'decline' | 'counter', counterAmount?: number) => Promise<void>;
+  acceptCounterOffer: (offerId: string) => Promise<string>;
+  withdrawOffer: (offerId: string) => void;
+  getOffersForListing: (listingId: string) => Offer[];
+  getOfferById: (id: string) => Offer | undefined;
+  getPendingOffersForSeller: () => Offer[];
+
   // Transactions
-  createTransaction: (listingId: string) => Promise<string>;
+  createTransaction: (listingId: string, offerId?: string, negotiatedPrice?: number, donation?: { option: DonationOption; amount: number }) => Promise<string>;
   getTransactionById: (id: string) => Transaction | undefined;
   updateTransactionStatus: (id: string, status: TransactionStatus, updates?: Partial<Transaction>) => void;
   getActiveTransactionForListing: (listingId: string) => Transaction | undefined;
+
+  // Charity
+  activeCharity: Charity;
+  getActiveCharity: () => Charity;
+  updateUserDonationTotal: (amount: number) => void;
 
   resetStore: () => void;
 }
@@ -74,7 +90,8 @@ const STORAGE_KEYS = {
   REVIEWS: 'cradle_reviews',
   TRANSACTIONS: 'cradle_transactions',
   REPORTS: 'cradle_reports',
-  COMPARE: 'cradle_compare'
+  COMPARE: 'cradle_compare',
+  OFFERS: 'cradle_offers'
 };
 
 // Helper to safely parse JSON from localStorage
@@ -105,7 +122,15 @@ const mapUserFromDB = (row: any): User => ({
   savedSearches: row.saved_searches || [],
   followingIds: row.following_ids || [],
   stripeAccountId: row.stripe_account_id,
-  stripeOnboarded: row.stripe_onboarded || false
+  stripeOnboarded: row.stripe_onboarded || false,
+  referralCode: row.referral_code,
+  referredBy: row.referred_by,
+  referralCredit: row.referral_credit || 0,
+  referralCount: row.referral_count || 0,
+  // Social/Community features
+  neighborhood: row.neighborhood,
+  kidAges: row.kid_ages || [],
+  parentingTags: row.parenting_tags || []
 });
 
 const mapListingFromDB = (row: any): Listing => ({
@@ -209,6 +234,7 @@ export const StoreProvider = ({ children }: { children?: ReactNode }) => {
   });
   const [transactions, setTransactions] = useState<Transaction[]>(() => safeParse(STORAGE_KEYS.TRANSACTIONS, []));
   const [reports, setReports] = useState<Report[]>(() => safeParse(STORAGE_KEYS.REPORTS, []));
+  const [offers, setOffers] = useState<Offer[]>(() => safeParse(STORAGE_KEYS.OFFERS, []));
   const [compareIds, setCompareIds] = useState<string[]>(() => safeParse(STORAGE_KEYS.COMPARE, []));
   const [locationStatus, setLocationStatus] = useState<'idle' | 'locating' | 'located' | 'error'>('idle');
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
@@ -297,6 +323,51 @@ export const StoreProvider = ({ children }: { children?: ReactNode }) => {
     fetchAllData();
   }, []);
 
+  // --- Session Restoration on Mount ---
+  useEffect(() => {
+    const restoreSession = async () => {
+      // Skip if we already have a user from localStorage
+      if (currentUser) return;
+
+      const session = await getSession();
+      if (session?.userId) {
+        const profile = await getUserProfile(session.userId);
+        if (profile) {
+          const restoredUser: User = {
+            id: profile.id,
+            name: profile.username || 'User',
+            location: profile.location_zip || '',
+            isVerifiedParent: profile.is_verified_parent || false,
+            isPremium: profile.is_premium || false,
+            isAdmin: profile.is_admin || false,
+            joinDate: profile.created_at,
+            itemsSold: profile.items_sold || 0,
+            avatarUrl: profile.avatar_url || '',
+            bio: profile.bio,
+            email: profile.email,
+            savedListingIds: profile.saved_listing_ids || [],
+            savedSearches: profile.saved_searches || [],
+            followingIds: profile.following_ids || [],
+            stripeAccountId: profile.stripe_account_id,
+            stripeOnboarded: profile.stripe_onboarded || false,
+            referralCode: profile.referral_code,
+            referredBy: profile.referred_by,
+            referralCredit: profile.referral_credit || 0,
+            referralCount: profile.referral_count || 0,
+            neighborhood: profile.neighborhood,
+            kidAges: profile.kid_ages || [],
+            parentingTags: profile.parenting_tags || []
+          };
+          setCurrentUser(restoredUser);
+          localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(restoredUser));
+          console.log('[Auth] Session restored for:', restoredUser.name);
+        }
+      }
+    };
+
+    restoreSession();
+  }, []);
+
   // --- Persistence to localStorage (fallback) ---
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.LISTINGS, JSON.stringify(listings)); }, [listings]);
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.CONVERSATIONS, JSON.stringify(conversations)); }, [conversations]);
@@ -304,10 +375,34 @@ export const StoreProvider = ({ children }: { children?: ReactNode }) => {
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.REVIEWS, JSON.stringify(reviews)); }, [reviews]);
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(transactions)); }, [transactions]);
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.REPORTS, JSON.stringify(reports)); }, [reports]);
+  useEffect(() => { localStorage.setItem(STORAGE_KEYS.OFFERS, JSON.stringify(offers)); }, [offers]);
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.COMPARE, JSON.stringify(compareIds)); }, [compareIds]);
 
+  // Generate a unique referral code (6 chars, alphanumeric)
+  const generateReferralCode = (userId: string): string => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Removed confusing chars (0,O,1,I)
+    let code = '';
+    for (let i = 0; i < 6; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return code;
+  };
+
   // --- Auth Functions ---
-  const login = async (user: User) => {
+  const login = async (user: User, referralCodeUsed?: string) => {
+    // Generate referral code for new users
+    if (!user.referralCode) {
+      user.referralCode = generateReferralCode(user.id);
+      user.referralCredit = 0;
+      user.referralCount = 0;
+    }
+
+    // If user signed up with a referral code, credit the referrer
+    if (referralCodeUsed && !user.referredBy) {
+      user.referredBy = referralCodeUsed;
+      await creditReferrer(referralCodeUsed);
+    }
+
     setCurrentUser(user);
     localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
 
@@ -328,13 +423,71 @@ export const StoreProvider = ({ children }: { children?: ReactNode }) => {
         saved_searches: user.savedSearches || [],
         following_ids: user.followingIds || [],
         stripe_account_id: user.stripeAccountId,
-        stripe_onboarded: user.stripeOnboarded
+        stripe_onboarded: user.stripeOnboarded,
+        referral_code: user.referralCode,
+        referred_by: user.referredBy,
+        referral_credit: user.referralCredit || 0,
+        referral_count: user.referralCount || 0,
+        // Social/Community features
+        neighborhood: user.neighborhood,
+        kid_ages: user.kidAges || [],
+        parenting_tags: user.parentingTags || []
       });
     }
   };
 
+  // Credit referrer $5 when someone uses their code
+  const creditReferrer = async (referralCode: string) => {
+    if (!supabase) return;
+
+    // Find user with this referral code
+    const { data: referrer } = await supabase
+      .from('users')
+      .select('*')
+      .eq('referral_code', referralCode)
+      .single();
+
+    if (referrer) {
+      const newCredit = (referrer.referral_credit || 0) + 5;
+      const newCount = (referrer.referral_count || 0) + 1;
+
+      await supabase
+        .from('users')
+        .update({
+          referral_credit: newCredit,
+          referral_count: newCount
+        })
+        .eq('id', referrer.id);
+
+      console.log(`Credited $5 to referrer ${referrer.username} (code: ${referralCode})`);
+    }
+  };
+
+  // Use referral credit on a transaction (reduces fee)
+  const useReferralCredit = async (amount: number): Promise<number> => {
+    if (!currentUser || !currentUser.referralCredit || currentUser.referralCredit <= 0) {
+      return 0;
+    }
+
+    const creditToUse = Math.min(amount, currentUser.referralCredit);
+    const newCredit = currentUser.referralCredit - creditToUse;
+
+    const updatedUser = { ...currentUser, referralCredit: newCredit };
+    setCurrentUser(updatedUser);
+    localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(updatedUser));
+
+    if (supabase) {
+      await supabase
+        .from('users')
+        .update({ referral_credit: newCredit })
+        .eq('id', currentUser.id);
+    }
+
+    return creditToUse;
+  };
+
   const logout = async () => {
-    if (supabase) await supabase.auth.signOut();
+    await supabaseSignOut();
     setCurrentUser(null);
     localStorage.removeItem(STORAGE_KEYS.USER);
     window.location.href = '/#/';
@@ -361,7 +514,15 @@ export const StoreProvider = ({ children }: { children?: ReactNode }) => {
         saved_searches: updatedUser.savedSearches || [],
         following_ids: updatedUser.followingIds || [],
         stripe_account_id: updatedUser.stripeAccountId,
-        stripe_onboarded: updatedUser.stripeOnboarded
+        stripe_onboarded: updatedUser.stripeOnboarded,
+        referral_code: updatedUser.referralCode,
+        referred_by: updatedUser.referredBy,
+        referral_credit: updatedUser.referralCredit || 0,
+        referral_count: updatedUser.referralCount || 0,
+        // Social/Community features
+        neighborhood: updatedUser.neighborhood,
+        kid_ages: updatedUser.kidAges || [],
+        parenting_tags: updatedUser.parentingTags || []
       });
     }
   };
@@ -708,22 +869,159 @@ export const StoreProvider = ({ children }: { children?: ReactNode }) => {
       new Date(b.date).getTime() - new Date(a.date).getTime()
     );
 
-  // --- Transactions ---
-  const createTransaction = async (listingId: string): Promise<string> => {
+  // --- Offers ---
+  const createOffer = async (listingId: string, amount: number, message?: string): Promise<string> => {
     if (!currentUser) throw new Error("Must be logged in");
     const listing = listings.find(l => l.id === listingId);
     if (!listing) throw new Error("Listing not found");
 
-    const platformFee = Math.round(listing.price * 0.08);
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24 hours
+
+    const newOffer: Offer = {
+      id: generateUUID(),
+      listingId,
+      buyerId: currentUser.id,
+      sellerId: listing.userId,
+      amount,
+      message,
+      status: OfferStatus.PENDING,
+      expiresAt: expiresAt.toISOString(),
+      createdAt: now.toISOString(),
+      updatedAt: now.toISOString()
+    };
+
+    setOffers(prev => [...prev, newOffer]);
+
+    // Sync to Supabase
+    if (supabase) {
+      await supabase.from('offers').insert({
+        id: newOffer.id,
+        listing_id: listingId,
+        buyer_id: currentUser.id,
+        seller_id: listing.userId,
+        amount,
+        message,
+        status: OfferStatus.PENDING,
+        expires_at: expiresAt.toISOString()
+      });
+    }
+
+    return newOffer.id;
+  };
+
+  const respondToOffer = async (offerId: string, response: 'accept' | 'decline' | 'counter', counterAmount?: number): Promise<void> => {
+    const offer = offers.find(o => o.id === offerId);
+    if (!offer) throw new Error("Offer not found");
+
+    let newStatus: OfferStatus;
+    switch (response) {
+      case 'accept':
+        newStatus = OfferStatus.ACCEPTED;
+        break;
+      case 'decline':
+        newStatus = OfferStatus.DECLINED;
+        break;
+      case 'counter':
+        newStatus = OfferStatus.COUNTERED;
+        break;
+    }
+
+    setOffers(prev => prev.map(o =>
+      o.id === offerId
+        ? { ...o, status: newStatus, counterAmount, updatedAt: new Date().toISOString() }
+        : o
+    ));
+
+    // Sync to Supabase
+    if (supabase) {
+      await supabase.from('offers').update({
+        status: newStatus,
+        counter_amount: counterAmount,
+        updated_at: new Date().toISOString()
+      }).eq('id', offerId);
+    }
+  };
+
+  const acceptCounterOffer = async (offerId: string): Promise<string> => {
+    const offer = offers.find(o => o.id === offerId);
+    if (!offer || offer.status !== OfferStatus.COUNTERED || !offer.counterAmount) {
+      throw new Error("Invalid offer state");
+    }
+
+    // Update offer to accepted
+    setOffers(prev => prev.map(o =>
+      o.id === offerId
+        ? { ...o, status: OfferStatus.ACCEPTED, updatedAt: new Date().toISOString() }
+        : o
+    ));
+
+    // Create transaction at counter amount
+    const txId = await createTransaction(offer.listingId, offerId, offer.counterAmount);
+    return txId;
+  };
+
+  const withdrawOffer = (offerId: string) => {
+    setOffers(prev => prev.map(o =>
+      o.id === offerId
+        ? { ...o, status: OfferStatus.WITHDRAWN, updatedAt: new Date().toISOString() }
+        : o
+    ));
+
+    if (supabase) {
+      supabase.from('offers').update({
+        status: OfferStatus.WITHDRAWN,
+        updated_at: new Date().toISOString()
+      }).eq('id', offerId);
+    }
+  };
+
+  const getOffersForListing = (listingId: string) =>
+    offers.filter(o => o.listingId === listingId).sort((a, b) =>
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+
+  const getOfferById = (id: string) => offers.find(o => o.id === id);
+
+  const getPendingOffersForSeller = () => {
+    if (!currentUser) return [];
+    return offers.filter(o =>
+      o.sellerId === currentUser.id &&
+      o.status === OfferStatus.PENDING
+    );
+  };
+
+  // --- Transactions ---
+  const createTransaction = async (
+    listingId: string,
+    offerId?: string,
+    negotiatedPrice?: number,
+    donation?: { option: DonationOption; amount: number }
+  ): Promise<string> => {
+    if (!currentUser) throw new Error("Must be logged in");
+    const listing = listings.find(l => l.id === listingId);
+    if (!listing) throw new Error("Listing not found");
+
+    const finalPrice = negotiatedPrice || listing.price;
+    const platformFee = Math.round(finalPrice * 0.08);
+    const donationAmount = donation?.amount || 0;
+    const total = finalPrice + platformFee + donationAmount;
+
     const newTransaction: Transaction = {
       id: generateUUID(),
       listingId,
       buyerId: currentUser.id,
       sellerId: listing.userId,
-      amount: listing.price,
+      amount: finalPrice,
       platformFee,
-      total: listing.price + platformFee,
+      total,
       status: TransactionStatus.INITIATED,
+      offerId,
+      originalListingPrice: negotiatedPrice ? listing.price : undefined,
+      // Charity donation fields
+      donationAmount: donationAmount > 0 ? donationAmount : undefined,
+      donationCharityId: donationAmount > 0 ? DEFAULT_CHARITY.id : undefined,
+      donationOption: donation?.option,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -736,10 +1034,15 @@ export const StoreProvider = ({ children }: { children?: ReactNode }) => {
         listing_id: listingId,
         buyer_id: currentUser.id,
         seller_id: listing.userId,
-        amount: listing.price,
+        amount: finalPrice,
         platform_fee: platformFee,
-        total: listing.price + platformFee,
-        status: TransactionStatus.INITIATED
+        total,
+        status: TransactionStatus.INITIATED,
+        offer_id: offerId,
+        original_listing_price: negotiatedPrice ? listing.price : null,
+        donation_amount: donationAmount > 0 ? donationAmount : null,
+        donation_charity_id: donationAmount > 0 ? DEFAULT_CHARITY.id : null,
+        donation_option: donation?.option || null
       });
     }
 
@@ -779,6 +1082,27 @@ export const StoreProvider = ({ children }: { children?: ReactNode }) => {
     }
   };
 
+  // --- Charity ---
+  const activeCharity = DEFAULT_CHARITY;
+
+  const getActiveCharity = () => DEFAULT_CHARITY;
+
+  const updateUserDonationTotal = (amount: number) => {
+    if (!currentUser || amount <= 0) return;
+
+    const newTotal = (currentUser.totalDonated || 0) + amount;
+    const updatedUser = { ...currentUser, totalDonated: newTotal };
+    setCurrentUser(updatedUser);
+    localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(updatedUser));
+
+    // Sync to Supabase
+    if (supabase) {
+      supabase.from('users').update({
+        total_donated: newTotal
+      }).eq('id', currentUser.id);
+    }
+  };
+
   const resetStore = () => {
     localStorage.clear();
     window.location.reload();
@@ -786,15 +1110,17 @@ export const StoreProvider = ({ children }: { children?: ReactNode }) => {
 
   return (
     <StoreContext.Provider value={{
-      listings, currentUser, conversations, messages, reviews, transactions, reports,
+      listings, currentUser, conversations, messages, reviews, transactions, reports, offers,
       userLocation, locationStatus, isLoading,
-      login, logout, updateUser, upgradeToPremium,
+      login, logout, updateUser, upgradeToPremium, useReferralCredit,
       addListing, updateListing, getListingById, deleteListing, markAsSold, toggleFavorite,
       getUserById, followUser, unfollowUser, reportListing, saveSearch, deleteSavedSearch,
       compareIds, toggleCompare, clearCompare,
       startConversation, sendMessage, markMessagesAsRead, getMessagesByConversationId, getConversationById,
       addReview, getReviewsByUserId,
+      createOffer, respondToOffer, acceptCounterOffer, withdrawOffer, getOffersForListing, getOfferById, getPendingOffersForSeller,
       createTransaction, getTransactionById, updateTransactionStatus, getActiveTransactionForListing,
+      activeCharity, getActiveCharity, updateUserDonationTotal,
       resetStore
     }}>
       {children}

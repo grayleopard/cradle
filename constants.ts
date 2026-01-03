@@ -1,5 +1,20 @@
-import { Listing, User, Condition, Category, AgeRange } from './types';
+import { Listing, User, Condition, Category, AgeRange, Charity } from './types';
 import { ZIP_COORDINATES } from './utils/locationHelpers';
+
+// Default charity for MVP - hardcoded single partner
+export const DEFAULT_CHARITY: Charity = {
+  id: 'charity-auburn-food-bank',
+  name: 'Auburn Food Bank',
+  shortDescription: 'Kids Backpack Program - weekend meals for local students',
+  fullDescription: 'The Auburn Food Bank serves families in need throughout the Auburn area. Their Kids Backpack Program provides weekend food packs to students who rely on school meals during the week.',
+  websiteUrl: 'https://auburnfoodbank.org',
+  logoUrl: '', // Add when available
+  locationCity: 'Auburn',
+  locationState: 'WA',
+  isActive: true,
+  totalReceived: 0,
+  createdAt: new Date().toISOString(),
+};
 
 export const CURRENT_USER: User = {
   id: 'u1',
@@ -69,7 +84,7 @@ export const MOCK_LISTINGS: Listing[] = [
     brand: 'UPPAbaby',
     isSmokeFree: true,
     isPetFree: true,
-    images: ['https://images.unsplash.com/photo-1591543620767-582b2e690bf3?auto=format&fit=crop&q=80&w=800'],
+    images: ['https://images.unsplash.com/photo-1594736797933-d0501ba2fe65?auto=format&fit=crop&q=80&w=800'],
     locationZip: '98001',
     coordinates: ZIP_COORDINATES['98001'],
     isSafetyVerified: true,
@@ -89,7 +104,7 @@ export const MOCK_LISTINGS: Listing[] = [
     brand: 'Lovevery',
     isSmokeFree: true,
     isPetFree: false,
-    images: ['https://images.unsplash.com/photo-1515488042361-25f4682ae2c7?auto=format&fit=crop&q=80&w=800'],
+    images: ['https://images.unsplash.com/photo-1596461404969-9ae70f2830c1?auto=format&fit=crop&q=80&w=800'],
     locationZip: '98002',
     coordinates: ZIP_COORDINATES['98002'],
     isSafetyVerified: true,
@@ -109,7 +124,7 @@ export const MOCK_LISTINGS: Listing[] = [
     brand: 'Ergobaby',
     isSmokeFree: true,
     isPetFree: true,
-    images: ['https://images.unsplash.com/photo-1528697203043-733dabdaa392?auto=format&fit=crop&q=80&w=800'],
+    images: ['https://images.unsplash.com/photo-1519689680058-324335c77eba?auto=format&fit=crop&q=80&w=800'],
     locationZip: '98092',
     coordinates: ZIP_COORDINATES['98092'],
     isSafetyVerified: true,
@@ -127,7 +142,7 @@ export const MOCK_LISTINGS: Listing[] = [
     ageRange: AgeRange.TWO_TO_THREE_YR,
     isSmokeFree: false,
     isPetFree: false,
-    images: ['https://images.unsplash.com/photo-1522771753035-4850d32fa302?auto=format&fit=crop&q=80&w=800'],
+    images: ['https://images.unsplash.com/photo-1519238263530-99bdd11df2ea?auto=format&fit=crop&q=80&w=800'],
     locationZip: '98001',
     coordinates: ZIP_COORDINATES['98001'],
     isSafetyVerified: false,

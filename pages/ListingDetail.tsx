@@ -4,28 +4,34 @@ import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { useStore } from '../context/StoreContext';
 import { useTheme } from '../context/ThemeContext';
 import { useToast } from '../context/ToastContext';
-import { ChevronLeft, Share2, Heart, MapPin, UserCheck, MessageCircle, Cigarette, Dog, Shield, Pencil, CheckCircle, Trash2, ChevronRight, Flag, ShoppingBag, ExternalLink, Sparkles, Loader2, TrendingUp, DollarSign, Home, X, ScanLine, ShieldCheck } from 'lucide-react';
+import { ChevronLeft, Share2, Heart, MapPin, UserCheck, MessageCircle, Cigarette, Dog, Shield, Pencil, CheckCircle, Trash2, ChevronRight, Flag, ShoppingBag, ExternalLink, Sparkles, Loader2, TrendingUp, DollarSign, Home, X, ScanLine, ShieldCheck, Star, Tag, Send } from 'lucide-react';
 import SafetyBadge from '../components/SafetyBadge';
 import ImageWithSkeleton from '../components/ImageWithSkeleton';
 import AuthModal from '../components/AuthModal';
-import { analyzeDeal } from '../services/geminiService';
-import { DealAnalysis } from '../types';
+import { analyzeDeal, DealAnalysisError } from '../services/geminiService';
+import { DealAnalysis, OfferStatus } from '../types';
 
 const ListingDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const { getListingById, startConversation, sendMessage, currentUser, getUserById, markAsSold, deleteListing, toggleFavorite, createTransaction, getActiveTransactionForListing, reportListing } = useStore();
+  const { getListingById, startConversation, sendMessage, currentUser, getUserById, markAsSold, deleteListing, toggleFavorite, createTransaction, getActiveTransactionForListing, reportListing, getReviewsByUserId, createOffer, getOffersForListing } = useStore();
   const { theme } = useTheme();
   const { showToast } = useToast();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   
   // Deal Analysis State
   const [analyzing, setAnalyzing] = useState(false);
-  const [dealAnalysis, setDealAnalysis] = useState<DealAnalysis | null>(null);
+  const [dealAnalysis, setDealAnalysis] = useState<DealAnalysis | DealAnalysisError | null>(null);
   const [showSafetyModal, setShowSafetyModal] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const [pendingAction, setPendingAction] = useState<'message' | 'buy' | 'favorite' | null>(null);
+  const [pendingAction, setPendingAction] = useState<'message' | 'buy' | 'favorite' | 'offer' | null>(null);
+
+  // Offer Modal State
+  const [showOfferModal, setShowOfferModal] = useState(false);
+  const [offerAmount, setOfferAmount] = useState('');
+  const [offerMessage, setOfferMessage] = useState('');
+  const [submittingOffer, setSubmittingOffer] = useState(false);
 
   // Swipe Gesture State
   const touchStart = useRef<number | null>(null);
@@ -71,10 +77,14 @@ const ListingDetail = () => {
   if (!listing) return <div className="p-4">Listing not found</div>;
 
   const seller = getUserById(listing.userId);
+  const sellerReviews = getReviewsByUserId(listing.userId);
+  const sellerRating = sellerReviews.length > 0
+    ? sellerReviews.reduce((acc, r) => acc + r.rating, 0) / sellerReviews.length
+    : (seller?.rating || 0);
   const isOwnListing = currentUser?.id === listing.userId;
   const isFavorite = currentUser?.savedListingIds?.includes(listing.id);
   const activeTransaction = getActiveTransactionForListing(listing.id);
-  const isHeirloom = theme === 'heirloom';
+  const isPipitV2 = theme === 'pipit-v2';
 
   const handleBack = () => {
     if (location.state?.from) {
@@ -133,9 +143,59 @@ const ListingDetail = () => {
     } else if (pendingAction === 'favorite') {
       toggleFavorite(listing.id);
       showToast('Added to favorites', 'success');
+    } else if (pendingAction === 'offer') {
+      setShowOfferModal(true);
     }
     setPendingAction(null);
   };
+
+  // Handle Make Offer
+  const handleMakeOffer = () => {
+    if (!currentUser) {
+      setPendingAction('offer');
+      setShowAuthModal(true);
+      return;
+    }
+    setOfferAmount('');
+    setOfferMessage('');
+    setShowOfferModal(true);
+  };
+
+  const handleSubmitOffer = async () => {
+    if (!listing || !offerAmount) return;
+
+    const amount = parseInt(offerAmount);
+    if (isNaN(amount) || amount <= 0) {
+      showToast('Please enter a valid amount', 'error');
+      return;
+    }
+
+    if (amount >= listing.price) {
+      showToast('Offer must be less than the asking price', 'error');
+      return;
+    }
+
+    setSubmittingOffer(true);
+    try {
+      await createOffer(listing.id, amount, offerMessage || undefined);
+
+      // Start chat and notify seller
+      const conversationId = await startConversation(listing.id);
+      sendMessage(conversationId, `💰 I've made an offer of $${amount} for this item.${offerMessage ? ` "${offerMessage}"` : ''}`);
+
+      setShowOfferModal(false);
+      showToast('Offer sent! The seller will be notified.', 'success');
+    } catch (e) {
+      showToast('Failed to send offer', 'error');
+    } finally {
+      setSubmittingOffer(false);
+    }
+  };
+
+  // Get user's existing offer for this listing
+  const myPendingOffer = listing ? getOffersForListing(listing.id).find(
+    o => o.buyerId === currentUser?.id && (o.status === OfferStatus.PENDING || o.status === OfferStatus.COUNTERED)
+  ) : null;
 
   const handleMarkSold = () => {
     if (window.confirm("Mark this item as sold? This will hide it from the main feed.")) {
@@ -194,13 +254,21 @@ const ListingDetail = () => {
     setAnalyzing(true);
     try {
       const result = await analyzeDeal(listing.title, listing.price, listing.condition, listing.originalPrice);
-      setDealAnalysis(result);
-      if (!result) showToast("Could not analyze deal. Try again.", "error");
+      if (result) {
+        setDealAnalysis(result);
+      } else {
+        showToast("Could not analyze deal. Try again.", "error");
+      }
     } catch (e) {
       showToast("Analysis failed", "error");
     } finally {
       setAnalyzing(false);
     }
+  };
+
+  // Helper to check if dealAnalysis is an error
+  const isDealAnalysisError = (result: DealAnalysis | DealAnalysisError | null): result is DealAnalysisError => {
+    return result !== null && 'error' in result && result.error === true;
   };
 
   const nextImage = (e: React.MouseEvent) => {
@@ -225,7 +293,7 @@ const ListingDetail = () => {
 
   return (
     <div 
-        className={`min-h-full pb-40 relative ${isHeirloom ? 'bg-[#F9F6F0]' : 'bg-white'}`}
+        className={`min-h-full pb-40 relative ${isPipitV2 ? 'bg-[#FFFCF9]' : 'bg-white'}`}
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
@@ -236,11 +304,11 @@ const ListingDetail = () => {
         <div className="flex gap-2 pointer-events-auto">
           <button 
             onClick={handleBack} 
-            className={`p-2 rounded-full shadow-sm transition-colors cursor-pointer ${isHeirloom ? 'bg-[#F9F6F0]/80 text-[#2F3E2E] hover:bg-[#F9F6F0]' : 'bg-white/80 backdrop-blur-md text-gray-800 hover:bg-white'}`}
+            className={`p-2 rounded-full shadow-sm transition-colors cursor-pointer ${isPipitV2 ? 'bg-[#FFFCF9]/80 text-[#4A3F37] hover:bg-[#FFFCF9]' : 'bg-white/80 backdrop-blur-md text-gray-800 hover:bg-white'}`}
           >
             <ChevronLeft className="w-5 h-5" />
           </button>
-          {!isHeirloom && (
+          {!isPipitV2 && (
             <button 
                 onClick={handleHome} 
                 className="p-2 bg-white/80 backdrop-blur-md rounded-full shadow-sm hover:bg-white transition-colors cursor-pointer"
@@ -253,13 +321,13 @@ const ListingDetail = () => {
         <div className="flex gap-2 pointer-events-auto">
            <button 
              onClick={handleShare}
-             className={`p-2 rounded-full shadow-sm transition-colors cursor-pointer ${isHeirloom ? 'bg-[#F9F6F0]/80 text-[#2F3E2E] hover:bg-[#F9F6F0]' : 'bg-white/80 backdrop-blur-md text-gray-800 hover:bg-white'}`}
+             className={`p-2 rounded-full shadow-sm transition-colors cursor-pointer ${isPipitV2 ? 'bg-[#FFFCF9]/80 text-[#4A3F37] hover:bg-[#FFFCF9]' : 'bg-white/80 backdrop-blur-md text-gray-800 hover:bg-white'}`}
            >
             <Share2 className="w-5 h-5" />
           </button>
           <button 
             onClick={handleToggleFavorite}
-            className={`p-2 rounded-full shadow-sm transition-colors cursor-pointer ${isHeirloom ? 'bg-[#F9F6F0]/80 hover:bg-[#F9F6F0]' : 'bg-white/80 backdrop-blur-md hover:bg-white'} ${isFavorite ? 'text-red-500' : isHeirloom ? 'text-[#2F3E2E]' : 'text-gray-800'}`}
+            className={`p-2 rounded-full shadow-sm transition-colors cursor-pointer ${isPipitV2 ? 'bg-[#FFFCF9]/80 hover:bg-[#FFFCF9]' : 'bg-white/80 backdrop-blur-md hover:bg-white'} ${isFavorite ? 'text-red-500' : isPipitV2 ? 'text-[#4A3F37]' : 'text-gray-800'}`}
           >
             <Heart className={`w-5 h-5 ${isFavorite ? 'fill-current' : ''}`} />
           </button>
@@ -267,7 +335,7 @@ const ListingDetail = () => {
       </div>
 
       {/* Image Gallery Carousel */}
-      <div className={`w-full relative group ${isHeirloom ? 'h-[50vh] rounded-b-[2.5rem] overflow-hidden shadow-sm' : 'h-80 bg-gray-200'}`}>
+      <div className={`w-full relative group ${isPipitV2 ? 'h-[50vh] rounded-b-[2.5rem] overflow-hidden shadow-sm' : 'h-80 bg-gray-200'}`}>
         <ImageWithSkeleton
           src={listing.images[currentImageIndex]} 
           alt={`${listing.title} - ${currentImageIndex + 1}`} 
@@ -317,24 +385,24 @@ const ListingDetail = () => {
       </div>
 
       {/* Content */}
-      <div className={`relative z-0 ${isHeirloom ? 'px-6 pt-6' : 'p-5 -mt-6 bg-white rounded-t-3xl'}`}>
+      <div className={`relative z-0 ${isPipitV2 ? 'px-6 pt-6' : 'p-5 -mt-6 bg-white rounded-t-3xl'}`}>
         <div className="flex justify-between items-start mb-2">
           <div className="flex-1 pr-4">
-            <span className={`text-xs font-semibold uppercase tracking-wide ${isHeirloom ? 'text-[#C68E68]' : 'text-brand-600'}`}>{listing.category}</span>
-            <h1 className={`${isHeirloom ? 'font-serif text-3xl text-[#2F3E2E] mt-2' : 'text-2xl font-bold text-gray-900 mt-1'} leading-tight`}>{listing.title}</h1>
+            <span className={`text-xs font-semibold uppercase tracking-wide ${isPipitV2 ? 'text-[#2D9B8C]' : 'text-[#2D9B8C]'}`}>{listing.category}</span>
+            <h1 className={`${isPipitV2 ? 'font-serif text-3xl text-[#4A3F37] mt-2' : 'text-2xl font-bold text-[#4A3F37] mt-1'} leading-tight`}>{listing.title}</h1>
           </div>
           <div className="flex flex-col items-end">
-            <div className={`${isHeirloom ? 'text-2xl font-sans text-[#2F3E2E]' : 'text-xl text-brand-600 bg-brand-50 px-3 py-1 rounded-lg'} font-bold whitespace-nowrap`}>
+            <div className={`${isPipitV2 ? 'text-2xl font-sans text-[#4A3F37]' : 'text-xl text-[#2D9B8C] bg-[#F0FAF8] px-3 py-1 rounded-lg'} font-bold whitespace-nowrap`}>
               ${listing.price}
             </div>
             {listing.originalPrice && (
-              <span className="text-xs text-gray-400 line-through mt-1">Retail ${listing.originalPrice}</span>
+              <span className="text-xs text-[#B8A395] line-through mt-1">Retail ${listing.originalPrice}</span>
             )}
             {!dealAnalysis && (
               <button 
                   onClick={handleAnalyzeDeal}
                   disabled={analyzing}
-                  className={`flex items-center gap-1 text-[10px] font-bold mt-2 px-2.5 py-1 rounded-full transition-colors ${isHeirloom ? 'bg-[#E3D5CA]/30 text-[#B07D5B]' : 'bg-purple-50 text-purple-600 hover:bg-purple-100'}`}
+                  className={`flex items-center gap-1 text-[10px] font-bold mt-2 px-2.5 py-1 rounded-full transition-colors ${isPipitV2 ? 'bg-[#E8DDD4]/30 text-[#247A6F]' : 'bg-purple-50 text-purple-600 hover:bg-purple-100'}`}
               >
                   {analyzing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
                   Is this a good deal?
@@ -344,12 +412,33 @@ const ListingDetail = () => {
         </div>
 
         {/* Deal Analyzer Section */}
-        {dealAnalysis && (
+        {dealAnalysis && isDealAnalysisError(dealAnalysis) && (
            <div className="mb-6 animate-in fade-in slide-in-from-top-4 duration-500">
-              <div className={`border rounded-xl p-4 shadow-sm relative overflow-hidden ${isHeirloom ? 'bg-white border-[#E3D5CA]' : 'bg-gradient-to-br from-gray-50 to-white border-gray-200'}`}>
+              <div className={`border rounded-xl p-4 shadow-sm relative overflow-hidden ${isPipitV2 ? 'bg-[#FFF4D9]/50 border-[#E8B44C]/30' : 'bg-yellow-50 border-yellow-200'}`}>
+                 <div className="flex items-start gap-3">
+                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-[#E8B44C]/20 flex items-center justify-center">
+                      <Sparkles className="w-4 h-4 text-[#B45309]" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-bold text-[#4A3F37] text-sm mb-1">AI Price Analysis Unavailable</h3>
+                      <p className="text-xs text-[#6B5D52]">{dealAnalysis.message}</p>
+                      <button
+                        onClick={() => setDealAnalysis(null)}
+                        className="mt-2 text-xs text-[#2D9B8C] hover:underline"
+                      >
+                        Dismiss
+                      </button>
+                    </div>
+                 </div>
+              </div>
+           </div>
+        )}
+        {dealAnalysis && !isDealAnalysisError(dealAnalysis) && (
+           <div className="mb-6 animate-in fade-in slide-in-from-top-4 duration-500">
+              <div className={`border rounded-xl p-4 shadow-sm relative overflow-hidden ${isPipitV2 ? 'bg-white border-[#E8DDD4]' : 'bg-gradient-to-br from-gray-50 to-white border-[#E8DDD4]'}`}>
                  <div className="flex justify-between items-start mb-3">
                     <div>
-                      <h3 className={`font-bold flex items-center gap-2 ${isHeirloom ? 'text-[#2F3E2E]' : 'text-gray-900'}`}>
+                      <h3 className={`font-bold flex items-center gap-2 ${isPipitV2 ? 'text-[#4A3F37]' : 'text-[#4A3F37]'}`}>
                         <Sparkles className="w-4 h-4 text-purple-500" /> AI Price Analysis
                       </h3>
                     </div>
@@ -357,19 +446,19 @@ const ListingDetail = () => {
                        Score: {dealAnalysis.dealScore}/10
                     </div>
                  </div>
-                 <p className="text-sm font-medium italic mb-2 text-gray-600">"{dealAnalysis.verdict}: {dealAnalysis.explanation}"</p>
-                 <div className="flex justify-between text-xs text-gray-500 mb-2">
+                 <p className="text-sm font-medium italic mb-2 text-[#6B5D52]">"{dealAnalysis.verdict}: {dealAnalysis.explanation}"</p>
+                 <div className="flex justify-between text-xs text-[#9A8578] mb-2">
                     <span>Retail: ${dealAnalysis.estimatedRetailPrice}</span>
                     <span className="text-green-600 font-bold">{Math.round(dealAnalysis.savingsPercentage)}% Savings</span>
                  </div>
-                 
+
                  {/* Display grounding sources for Search Grounding compliance */}
                  {dealAnalysis.sources && dealAnalysis.sources.length > 0 && (
-                   <div className="mt-2 pt-2 border-t border-gray-100">
-                      <p className="text-[10px] font-bold text-gray-400 mb-1 uppercase tracking-tight">Verified Price Sources:</p>
+                   <div className="mt-2 pt-2 border-t border-[#F5EDE6]">
+                      <p className="text-[10px] font-bold text-[#B8A395] mb-1 uppercase tracking-tight">Verified Price Sources:</p>
                       <div className="flex flex-wrap gap-2">
                          {dealAnalysis.sources.map((s, idx) => (
-                           <a key={idx} href={s.uri} target="_blank" rel="noopener noreferrer" className="text-[10px] text-brand-600 hover:underline flex items-center gap-0.5">
+                           <a key={idx} href={s.uri} target="_blank" rel="noopener noreferrer" className="text-[10px] text-[#2D9B8C] hover:underline flex items-center gap-0.5">
                              <ExternalLink className="w-2.5 h-2.5" /> {s.title}
                            </a>
                          ))}
@@ -381,42 +470,42 @@ const ListingDetail = () => {
         )}
 
         {/* Safety Status */}
-        <div onClick={() => setShowSafetyModal(true)} className={`my-6 rounded-xl border overflow-hidden cursor-pointer transition-colors ${isHeirloom ? 'bg-[#F5EBE0]/50 border-[#E3D5CA]' : 'bg-brand-50/50 border-brand-100 active:bg-brand-50'}`}>
+        <div onClick={() => setShowSafetyModal(true)} className={`my-6 rounded-xl border overflow-hidden cursor-pointer transition-colors ${isPipitV2 ? 'bg-[#F5EDE6]/50 border-[#E8DDD4]' : 'bg-[#F0FAF8]/50 border-brand-100 active:bg-[#F0FAF8]'}`}>
            <div className="p-3 flex items-start gap-3">
               <SafetyBadge isVerified={listing.isSafetyVerified} size="lg" />
               <div className="flex-1">
-                <p className={`text-xs mt-1 leading-relaxed ${isHeirloom ? 'text-[#5C5C5C]' : 'text-brand-800'}`}>
+                <p className={`text-xs mt-1 leading-relaxed ${isPipitV2 ? 'text-[#6B5D52]' : 'text-brand-800'}`}>
                   {listing.isSafetyVerified 
                     ? "This item has passed our AI-powered CPSC recall database check." 
                     : "This item requires manual safety verification."}
                 </p>
               </div>
-              <ChevronRight className={`w-4 h-4 self-center ${isHeirloom ? 'text-[#C68E68]' : 'text-brand-300'}`} />
+              <ChevronRight className={`w-4 h-4 self-center ${isPipitV2 ? 'text-[#2D9B8C]' : 'text-brand-300'}`} />
            </div>
         </div>
 
         {/* Details Grid */}
         <div className="grid grid-cols-2 gap-3 mb-6">
-          <div className={`${isHeirloom ? 'bg-white border border-[#E3D5CA]' : 'bg-gray-50'} p-3 rounded-xl`}>
-            <span className="text-xs text-gray-500 block mb-1">Condition</span>
-            <span className={`font-medium ${isHeirloom ? 'text-[#2F3E2E]' : 'text-gray-900'}`}>{listing.condition}</span>
+          <div className={`${isPipitV2 ? 'bg-white border border-[#E8DDD4]' : 'bg-[#F5EDE6]'} p-3 rounded-xl`}>
+            <span className="text-xs text-[#9A8578] block mb-1">Condition</span>
+            <span className={`font-medium ${isPipitV2 ? 'text-[#4A3F37]' : 'text-[#4A3F37]'}`}>{listing.condition}</span>
           </div>
-          <div className={`${isHeirloom ? 'bg-white border border-[#E3D5CA]' : 'bg-gray-50'} p-3 rounded-xl`}>
-            <span className="text-xs text-gray-500 block mb-1">Age Range</span>
-            <span className={`font-medium ${isHeirloom ? 'text-[#2F3E2E]' : 'text-gray-900'}`}>{listing.ageRange}</span>
+          <div className={`${isPipitV2 ? 'bg-white border border-[#E8DDD4]' : 'bg-[#F5EDE6]'} p-3 rounded-xl`}>
+            <span className="text-xs text-[#9A8578] block mb-1">Age Range</span>
+            <span className={`font-medium ${isPipitV2 ? 'text-[#4A3F37]' : 'text-[#4A3F37]'}`}>{listing.ageRange}</span>
           </div>
         </div>
 
         {/* Description */}
         <div className="mb-8">
-          <h3 className={`font-semibold mb-2 ${isHeirloom ? 'text-[#2F3E2E] font-serif text-lg' : 'text-gray-900'}`}>Description</h3>
-          <p className={`leading-relaxed text-sm whitespace-pre-line ${isHeirloom ? 'text-[#5C5C5C]' : 'text-gray-600'}`}>{listing.description}</p>
+          <h3 className={`font-semibold mb-2 ${isPipitV2 ? 'text-[#4A3F37] font-serif text-lg' : 'text-[#4A3F37]'}`}>Description</h3>
+          <p className={`leading-relaxed text-sm whitespace-pre-line ${isPipitV2 ? 'text-[#6B5D52]' : 'text-[#6B5D52]'}`}>{listing.description}</p>
         </div>
 
         {/* Seller Info */}
-        <div className={`border-t pt-6 ${isHeirloom ? 'border-[#E3D5CA]' : 'border-gray-100'}`}>
-           <h3 className={`font-semibold mb-4 ${isHeirloom ? 'text-[#2F3E2E] font-serif text-lg' : 'text-gray-900'}`}>Seller</h3>
-           <Link to={`/user/${listing.userId}`} className={`flex items-center gap-4 p-3 rounded-2xl transition-colors ${isHeirloom ? 'bg-white border border-[#E3D5CA]' : 'hover:bg-gray-50 -ml-2'}`}>
+        <div className={`border-t pt-6 ${isPipitV2 ? 'border-[#E8DDD4]' : 'border-[#F5EDE6]'}`}>
+           <h3 className={`font-semibold mb-4 ${isPipitV2 ? 'text-[#4A3F37] font-serif text-lg' : 'text-[#4A3F37]'}`}>Seller</h3>
+           <Link to={`/user/${listing.userId}`} className={`flex items-center gap-4 p-3 rounded-2xl transition-colors ${isPipitV2 ? 'bg-white border border-[#E8DDD4]' : 'hover:bg-[#F5EDE6] -ml-2'}`}>
              <img 
                src={seller?.avatarUrl || 'https://via.placeholder.com/100'} 
                className="w-12 h-12 rounded-full object-cover" 
@@ -424,14 +513,23 @@ const ListingDetail = () => {
              />
              <div className="flex-1">
                <div className="flex items-center gap-1">
-                 <span className={`font-medium ${isHeirloom ? 'text-[#2F3E2E]' : 'text-gray-900'}`}>{seller?.name || 'Unknown User'}</span>
+                 <span className={`font-medium ${isPipitV2 ? 'text-[#4A3F37]' : 'text-[#4A3F37]'}`}>{seller?.name || 'Unknown User'}</span>
                  {seller?.isVerifiedParent && <UserCheck className="w-3 h-3 text-blue-500" />}
                </div>
-               <div className="text-xs text-gray-500">
-                  {seller?.itemsSold || 0} items sold • Joined {seller?.joinDate}
+               <div className="flex items-center gap-2 mt-0.5">
+                 {sellerRating > 0 && (
+                   <div className="flex items-center gap-0.5 bg-yellow-50 px-1.5 py-0.5 rounded">
+                     <Star className="w-3 h-3 text-yellow-400 fill-current" />
+                     <span className="text-xs font-medium text-[#4A3F37]">{sellerRating.toFixed(1)}</span>
+                     <span className="text-[10px] text-[#B8A395]">({sellerReviews.length})</span>
+                   </div>
+                 )}
+                 <span className="text-xs text-[#9A8578]">
+                    {seller?.itemsSold || 0} sold
+                 </span>
                </div>
              </div>
-             <div className="text-xs text-gray-400 text-right">
+             <div className="text-xs text-[#B8A395] text-right">
                 <div className="flex items-center justify-end gap-1 mb-0.5">
                   <MapPin className="w-3 h-3" />
                   {listing.locationZip}
@@ -445,7 +543,7 @@ const ListingDetail = () => {
         <div className="mt-8 text-center pb-8">
           <button 
             onClick={handleReport}
-            className="text-xs text-gray-400 flex items-center justify-center gap-1 mx-auto hover:text-red-500 transition-colors"
+            className="text-xs text-[#B8A395] flex items-center justify-center gap-1 mx-auto hover:text-red-500 transition-colors"
           >
             <Flag className="w-3 h-3" />
             Report this listing
@@ -454,12 +552,12 @@ const ListingDetail = () => {
       </div>
 
       {/* Sticky Action Bar */}
-      <div className={`fixed bottom-0 left-0 right-0 p-4 border-t max-w-md mx-auto z-50 ${isHeirloom ? 'bg-[#F9F6F0] border-[#E3D5CA]' : 'bg-white border-gray-100'}`}>
+      <div className={`fixed bottom-0 left-0 right-0 p-4 border-t max-w-md mx-auto z-50 ${isPipitV2 ? 'bg-[#FFFCF9] border-[#E8DDD4]' : 'bg-white border-[#F5EDE6]'}`}>
         {isOwnListing ? (
           <div className="grid grid-cols-2 gap-3">
              {listing.isSold ? (
                <>
-                 <button disabled className="bg-gray-100 text-gray-400 font-semibold py-3.5 rounded-xl flex items-center justify-center gap-2 cursor-not-allowed">
+                 <button disabled className="bg-[#E8DDD4] text-[#B8A395] font-semibold py-3.5 rounded-xl flex items-center justify-center gap-2 cursor-not-allowed">
                   <CheckCircle className="w-5 h-5" /> Sold
                 </button>
                 <button onClick={handleDelete} className="bg-red-50 text-red-600 font-semibold py-3.5 rounded-xl flex items-center justify-center gap-2 hover:bg-red-100 transition-colors">
@@ -468,10 +566,10 @@ const ListingDetail = () => {
                </>
              ) : (
                <>
-                <button onClick={() => navigate(`/edit/${listing.id}`)} className="bg-white border-2 border-gray-200 text-gray-700 font-semibold py-3.5 rounded-xl flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors">
+                <button onClick={() => navigate(`/edit/${listing.id}`)} className="bg-white border-2 border-[#E8DDD4] text-[#4A3F37] font-semibold py-3.5 rounded-xl flex items-center justify-center gap-2 hover:bg-[#F5EDE6] transition-colors">
                   <Pencil className="w-5 h-5" /> Edit
                 </button>
-                <button onClick={handleMarkSold} className={`font-semibold py-3.5 rounded-xl shadow-lg flex items-center justify-center gap-2 transition-colors ${isHeirloom ? 'bg-[#C68E68] text-white hover:bg-[#B07D5B]' : 'bg-brand-600 text-white hover:bg-brand-700'}`}>
+                <button onClick={handleMarkSold} className={`font-semibold py-3.5 rounded-xl shadow-lg flex items-center justify-center gap-2 transition-colors ${isPipitV2 ? 'bg-[#2D9B8C] text-white hover:bg-[#247A6F]' : 'bg-[#2D9B8C] text-white hover:bg-[#247A6F]'}`}>
                   <CheckCircle className="w-5 h-5" /> Mark Sold
                 </button>
                </>
@@ -479,25 +577,74 @@ const ListingDetail = () => {
           </div>
         ) : (
           listing.isSold ? (
-            <button disabled className="w-full bg-gray-100 text-gray-400 font-semibold py-3.5 rounded-xl flex items-center justify-center gap-2 cursor-not-allowed">
+            <button disabled className="w-full bg-[#E8DDD4] text-[#B8A395] font-semibold py-3.5 rounded-xl flex items-center justify-center gap-2 cursor-not-allowed">
               This item has been sold
             </button>
+          ) : myPendingOffer ? (
+            // Show pending offer status
+            <div className="space-y-2">
+              <div className={`p-3 rounded-xl text-center ${myPendingOffer.status === OfferStatus.COUNTERED ? 'bg-yellow-50 border border-yellow-200' : 'bg-[#F5EDE6] border border-[#E8DDD4]'}`}>
+                {myPendingOffer.status === OfferStatus.COUNTERED ? (
+                  <>
+                    <p className="text-sm font-medium text-yellow-800">Counter offer: ${myPendingOffer.counterAmount}</p>
+                    <p className="text-xs text-yellow-600">Your offer: ${myPendingOffer.amount}</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm font-medium text-[#4A3F37]">Offer pending: ${myPendingOffer.amount}</p>
+                    <p className="text-xs text-[#6B5D52]">Waiting for seller response</p>
+                  </>
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={handleMessageSeller}
+                  className="font-semibold py-3 rounded-xl flex items-center justify-center gap-2 bg-white border border-[#2D9B8C] text-[#2D9B8C]"
+                >
+                  <MessageCircle className="w-4 h-4" />
+                  Chat
+                </button>
+                {myPendingOffer.status === OfferStatus.COUNTERED && (
+                  <button
+                    onClick={async () => {
+                      // Accept counter offer - create transaction at counter price
+                      const txId = await createTransaction(listing.id, myPendingOffer.id, myPendingOffer.counterAmount);
+                      showToast('Counter offer accepted!', 'success');
+                      navigate(`/transaction/${txId}`);
+                    }}
+                    className="font-semibold py-3 rounded-xl flex items-center justify-center gap-2 bg-[#2D9B8C] text-white"
+                  >
+                    <CheckCircle className="w-4 h-4" />
+                    Accept ${myPendingOffer.counterAmount}
+                  </button>
+                )}
+              </div>
+            </div>
           ) : (
-            <div className="grid grid-cols-5 gap-3">
-               <button 
-                 onClick={handleMessageSeller}
-                 className={`col-span-2 font-semibold py-3.5 rounded-xl flex items-center justify-center gap-2 transition-colors ${isHeirloom ? 'bg-white border border-[#C68E68] text-[#C68E68]' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
-               >
-                 <MessageCircle className="w-5 h-5" />
-                 Chat
-               </button>
-               <button 
-                 onClick={handleRequestToBuy}
-                 className={`col-span-3 font-semibold py-3.5 rounded-xl shadow-lg flex items-center justify-center gap-2 transition-colors ${isHeirloom ? 'bg-[#C68E68] text-white hover:bg-[#B07D5B]' : 'bg-brand-600 text-white hover:bg-brand-700'}`}
-               >
-                 <ShoppingBag className="w-5 h-5" />
-                 {activeTransaction ? 'View Request' : 'Request to Buy'}
-               </button>
+            <div className="space-y-2">
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={handleMessageSeller}
+                  className={`font-semibold py-3.5 rounded-xl flex items-center justify-center gap-2 transition-colors ${isPipitV2 ? 'bg-white border border-[#E8DDD4] text-[#4A3F37]' : 'bg-[#E8DDD4] text-[#4A3F37] hover:bg-gray-200'}`}
+                >
+                  <MessageCircle className="w-5 h-5" />
+                  Chat
+                </button>
+                <button
+                  onClick={handleMakeOffer}
+                  className={`font-semibold py-3.5 rounded-xl flex items-center justify-center gap-2 transition-colors ${isPipitV2 ? 'bg-white border border-[#2D9B8C] text-[#2D9B8C]' : 'bg-[#E8DDD4] text-[#4A3F37] hover:bg-gray-200'}`}
+                >
+                  <Tag className="w-5 h-5" />
+                  Make Offer
+                </button>
+              </div>
+              <button
+                onClick={handleRequestToBuy}
+                className={`w-full font-semibold py-3.5 rounded-xl shadow-lg flex items-center justify-center gap-2 transition-colors ${isPipitV2 ? 'bg-[#2D9B8C] text-white hover:bg-[#247A6F]' : 'bg-[#2D9B8C] text-white hover:bg-[#247A6F]'}`}
+              >
+                <ShoppingBag className="w-5 h-5" />
+                {activeTransaction ? 'View Request' : `Buy Now • $${listing.price}`}
+              </button>
             </div>
           )
         )}
@@ -507,42 +654,140 @@ const ListingDetail = () => {
       {showSafetyModal && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in">
            <div className="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl animate-in slide-in-from-bottom-10 relative">
-              <button onClick={() => setShowSafetyModal(false)} className="absolute top-4 right-4 p-1 rounded-full hover:bg-gray-100"><X className="w-5 h-5 text-gray-500" /></button>
+              <button onClick={() => setShowSafetyModal(false)} className="absolute top-4 right-4 p-1 rounded-full hover:bg-[#E8DDD4]"><X className="w-5 h-5 text-[#9A8578]" /></button>
               
               <div className="flex flex-col items-center text-center mb-6">
-                 <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-4 ${isHeirloom ? 'bg-white border border-[#E3D5CA]' : 'bg-brand-100'}`}>
-                    <ShieldCheck className={`w-8 h-8 ${isHeirloom ? 'text-[#C68E68]' : 'text-brand-600'}`} />
+                 <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-4 ${isPipitV2 ? 'bg-white border border-[#E8DDD4]' : 'bg-brand-100'}`}>
+                    <ShieldCheck className={`w-8 h-8 ${isPipitV2 ? 'text-[#2D9B8C]' : 'text-[#2D9B8C]'}`} />
                  </div>
-                 <h3 className="text-xl font-bold text-gray-900 mb-2">The Pipit Safety Promise</h3>
-                 <p className="text-sm text-gray-500 leading-relaxed">
+                 <h3 className="text-xl font-bold text-[#4A3F37] mb-2">The Pipit Safety Promise</h3>
+                 <p className="text-sm text-[#9A8578] leading-relaxed">
                     We use Google Gemini AI to analyze every listing against thousands of safety recalls.
                  </p>
               </div>
 
               <div className="space-y-4 mb-6">
                  <div className="flex gap-3 text-left">
-                    <ScanLine className={`w-5 h-5 flex-shrink-0 mt-0.5 ${isHeirloom ? 'text-[#C68E68]' : 'text-brand-500'}`} />
+                    <ScanLine className={`w-5 h-5 flex-shrink-0 mt-0.5 ${isPipitV2 ? 'text-[#2D9B8C]' : 'text-brand-500'}`} />
                     <div>
-                       <h4 className="font-bold text-sm text-gray-900">Real-Time Check</h4>
-                       <p className="text-xs text-gray-500">We scan the title, description, and images for known recalled models.</p>
+                       <h4 className="font-bold text-sm text-[#4A3F37]">Real-Time Check</h4>
+                       <p className="text-xs text-[#9A8578]">We scan the title, description, and images for known recalled models.</p>
                     </div>
                  </div>
                  <div className="flex gap-3 text-left">
-                    <ExternalLink className={`w-5 h-5 flex-shrink-0 mt-0.5 ${isHeirloom ? 'text-[#C68E68]' : 'text-brand-500'}`} />
+                    <ExternalLink className={`w-5 h-5 flex-shrink-0 mt-0.5 ${isPipitV2 ? 'text-[#2D9B8C]' : 'text-brand-500'}`} />
                     <div>
-                       <h4 className="font-bold text-sm text-gray-900">CPSC Database</h4>
-                       <p className="text-xs text-gray-500">Cross-referenced with the official Consumer Product Safety Commission data.</p>
+                       <h4 className="font-bold text-sm text-[#4A3F37]">CPSC Database</h4>
+                       <p className="text-xs text-[#9A8578]">Cross-referenced with the official Consumer Product Safety Commission data.</p>
                     </div>
                  </div>
               </div>
 
               <button 
                 onClick={() => setShowSafetyModal(false)}
-                className={`w-full py-3 text-white font-bold rounded-xl ${isHeirloom ? 'bg-[#C68E68]' : 'bg-brand-600'}`}
+                className={`w-full py-3 text-white font-bold rounded-xl ${isPipitV2 ? 'bg-[#2D9B8C]' : 'bg-[#2D9B8C]'}`}
               >
                 Got it
               </button>
            </div>
+        </div>
+      )}
+
+      {/* Make Offer Modal */}
+      {showOfferModal && listing && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in">
+          <div className="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl animate-in slide-in-from-bottom-10 relative">
+            <button
+              onClick={() => setShowOfferModal(false)}
+              className="absolute top-4 right-4 p-1 rounded-full hover:bg-[#E8DDD4]"
+            >
+              <X className="w-5 h-5 text-[#9A8578]" />
+            </button>
+
+            <div className="mb-6">
+              <h3 className="text-xl font-bold text-[#4A3F37] font-serif mb-1">Make an Offer</h3>
+              <p className="text-sm text-[#6B5D52]">
+                Asking price: <span className="font-semibold">${listing.price}</span>
+              </p>
+            </div>
+
+            {/* Quick offer buttons */}
+            <div className="grid grid-cols-3 gap-2 mb-4">
+              {[0.9, 0.85, 0.8].map((percent) => {
+                const suggestedPrice = Math.round(listing.price * percent);
+                return (
+                  <button
+                    key={percent}
+                    onClick={() => setOfferAmount(suggestedPrice.toString())}
+                    className={`py-2 rounded-lg text-sm font-medium transition-colors ${
+                      offerAmount === suggestedPrice.toString()
+                        ? 'bg-[#2D9B8C] text-white'
+                        : 'bg-[#F5EDE6] text-[#4A3F37] hover:bg-[#E8DDD4]'
+                    }`}
+                  >
+                    ${suggestedPrice}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Custom amount input */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-[#6B5D52] mb-1">
+                Your offer
+              </label>
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#4A3F37] font-medium">
+                  $
+                </span>
+                <input
+                  type="number"
+                  value={offerAmount}
+                  onChange={(e) => setOfferAmount(e.target.value)}
+                  placeholder={Math.round(listing.price * 0.85).toString()}
+                  className="w-full pl-8 pr-4 py-3 rounded-xl border border-[#E8DDD4] text-[#4A3F37] text-lg font-medium focus:outline-none focus:ring-2 focus:ring-[#2D9B8C]"
+                />
+              </div>
+              {offerAmount && parseInt(offerAmount) < listing.price && (
+                <p className="text-xs text-[#2D9B8C] mt-1">
+                  {Math.round((1 - parseInt(offerAmount) / listing.price) * 100)}% off asking price
+                </p>
+              )}
+            </div>
+
+            {/* Optional message */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-[#6B5D52] mb-1">
+                Message (optional)
+              </label>
+              <textarea
+                value={offerMessage}
+                onChange={(e) => setOfferMessage(e.target.value)}
+                placeholder="I'm very interested in this item..."
+                rows={2}
+                className="w-full px-4 py-3 rounded-xl border border-[#E8DDD4] text-[#4A3F37] text-sm focus:outline-none focus:ring-2 focus:ring-[#2D9B8C] resize-none"
+              />
+            </div>
+
+            <button
+              onClick={handleSubmitOffer}
+              disabled={submittingOffer || !offerAmount}
+              className="w-full py-3.5 rounded-xl font-bold text-white bg-[#2D9B8C] hover:bg-[#247A6F] disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+            >
+              {submittingOffer ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                <>
+                  <Send className="w-5 h-5" />
+                  Send Offer
+                </>
+              )}
+            </button>
+
+            <p className="text-[10px] text-[#B8A395] text-center mt-3">
+              The seller has 24 hours to respond to your offer
+            </p>
+          </div>
         </div>
       )}
 

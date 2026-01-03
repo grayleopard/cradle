@@ -117,16 +117,43 @@ export const checkProductSafety = async (
   }
 };
 
+export interface DealAnalysisError {
+  error: true;
+  message: string;
+  isApiKeyMissing?: boolean;
+}
+
 export const analyzeDeal = async (
   title: string,
   price: number,
   condition: string,
   originalPrice?: number
-): Promise<DealAnalysis | null> => {
+): Promise<DealAnalysis | DealAnalysisError | null> => {
   try {
     return await callGeminiAPI<DealAnalysis>('analyzeDeal', { title, price, condition, originalPrice });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Deal analysis failed:", error);
+
+    const errorMessage = error?.message || '';
+
+    // Check for API key missing error
+    if (errorMessage.includes('GROQ_API_KEY') || errorMessage.includes('not configured')) {
+      return {
+        error: true,
+        message: 'AI pricing not configured. Set up GROQ_API_KEY to enable deal analysis.',
+        isApiKeyMissing: true
+      };
+    }
+
+    // Generic API error
+    if (errorMessage.includes('API error') || errorMessage.includes('Groq API')) {
+      return {
+        error: true,
+        message: 'AI service temporarily unavailable. Try again later.',
+        isApiKeyMissing: false
+      };
+    }
+
     return null;
   }
 };

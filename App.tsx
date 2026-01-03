@@ -22,6 +22,7 @@ import Transaction from './pages/Transaction';
 import AdminDashboard from './pages/AdminDashboard';
 import DevSettings from './pages/DevSettings';
 import Compare from './pages/Compare';
+import DesignPreview from './pages/DesignPreview';
 
 // Wrapper for routes that require authentication
 const ProtectedRoute = ({ children }: { children?: React.ReactNode }) => {
@@ -62,7 +63,10 @@ const AppRoutes = () => {
       <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
       <Route path="/settings/dev" element={<ProtectedRoute><DevSettings /></ProtectedRoute>} />
       <Route path="/compare" element={<ProtectedRoute><Compare /></ProtectedRoute>} />
-      
+
+      {/* Design Preview - standalone, no layout */}
+      <Route path="/design" element={<DesignPreview />} />
+
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

@@ -1,20 +1,40 @@
 
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, Save, Database, Image, RotateCcw } from 'lucide-react';
+import { ChevronLeft, Save, Database, Image, RotateCcw, ShieldAlert } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
+import { useStore } from '../context/StoreContext';
 
 const DevSettings = () => {
   const navigate = useNavigate();
   const { showToast } = useToast();
+  const { currentUser } = useStore();
 
-  // Initialize state lazily with explicit typing to Record<string, string>
-  // Removed Gemini API Key from manual configuration as it is strictly environment-based
+  // Admin-only access
+  if (!currentUser?.isAdmin) {
+    return (
+      <div className="min-h-full bg-[#F9F6F0] flex items-center justify-center p-6">
+        <div className="text-center">
+          <ShieldAlert className="w-12 h-12 text-red-400 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-[#2F3E2E] mb-2">Access Denied</h2>
+          <p className="text-[#5C5C5C] mb-4">This page is only available to administrators.</p>
+          <button
+            onClick={() => navigate('/profile')}
+            className="px-6 py-2 bg-[#2F3E2E] text-white rounded-xl font-medium"
+          >
+            Go Back
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Initialize state - no hardcoded fallbacks for security
   const [keys, setKeys] = useState<Record<string, string>>(() => ({
-    VITE_SUPABASE_URL: localStorage.getItem('VITE_SUPABASE_URL') || 'https://heykcjvqkkecpcrjowjy.supabase.co',
-    VITE_SUPABASE_ANON_KEY: localStorage.getItem('VITE_SUPABASE_ANON_KEY') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhleWtjanZxa2tlY3Bjcmpvd2p5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcyOTg2NzYsImV4cCI6MjA4Mjg3NDY3Nn0.G3IO36EqdfHeIuDhnZK_qjfbC-ba0E1dmXNOzyXFyQM',
-    VITE_CLOUDINARY_CLOUD_NAME: localStorage.getItem('VITE_CLOUDINARY_CLOUD_NAME') || 'dgq9mn6uz',
-    VITE_CLOUDINARY_UPLOAD_PRESET: localStorage.getItem('VITE_CLOUDINARY_UPLOAD_PRESET') || 'cradle_uploads'
+    VITE_SUPABASE_URL: localStorage.getItem('VITE_SUPABASE_URL') || '',
+    VITE_SUPABASE_ANON_KEY: localStorage.getItem('VITE_SUPABASE_ANON_KEY') || '',
+    VITE_CLOUDINARY_CLOUD_NAME: localStorage.getItem('VITE_CLOUDINARY_CLOUD_NAME') || '',
+    VITE_CLOUDINARY_UPLOAD_PRESET: localStorage.getItem('VITE_CLOUDINARY_UPLOAD_PRESET') || ''
   }));
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
