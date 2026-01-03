@@ -47,6 +47,7 @@ interface StoreContextType {
   // Chat
   startConversation: (listingId: string) => Promise<string>;
   sendMessage: (conversationId: string, text: string) => void;
+  markMessagesAsRead: (conversationId: string) => void;
   getMessagesByConversationId: (conversationId: string) => Message[];
   getConversationById: (conversationId: string) => Conversation | undefined;
 
@@ -660,6 +661,25 @@ export const StoreProvider = ({ children }: { children?: ReactNode }) => {
     }
   };
 
+  const markMessagesAsRead = async (conversationId: string) => {
+    if (!currentUser) return;
+
+    setMessages(prev => prev.map(m =>
+      m.conversationId === conversationId && m.senderId !== currentUser.id && !m.isRead
+        ? { ...m, isRead: true }
+        : m
+    ));
+
+    // Sync to Supabase
+    if (supabase) {
+      await supabase
+        .from('messages')
+        .update({ is_read: true })
+        .eq('conversation_id', conversationId)
+        .neq('sender_id', currentUser.id);
+    }
+  };
+
   const getMessagesByConversationId = (id: string) =>
     messages.filter(m => m.conversationId === id).sort((a, b) =>
       new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
@@ -772,7 +792,7 @@ export const StoreProvider = ({ children }: { children?: ReactNode }) => {
       addListing, updateListing, getListingById, deleteListing, markAsSold, toggleFavorite,
       getUserById, followUser, unfollowUser, reportListing, saveSearch, deleteSavedSearch,
       compareIds, toggleCompare, clearCompare,
-      startConversation, sendMessage, getMessagesByConversationId, getConversationById,
+      startConversation, sendMessage, markMessagesAsRead, getMessagesByConversationId, getConversationById,
       addReview, getReviewsByUserId,
       createTransaction, getTransactionById, updateTransactionStatus, getActiveTransactionForListing,
       resetStore

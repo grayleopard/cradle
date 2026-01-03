@@ -11,7 +11,7 @@ import { generateSmartReplies, extractMeetingDetails, MeetingDetails } from '../
 const Chat = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { getConversationById, getMessagesByConversationId, getListingById, sendMessage, currentUser, markAsSold, addReview, getUserById, getActiveTransactionForListing, createTransaction, updateTransactionStatus, listings } = useStore();
+  const { getConversationById, getMessagesByConversationId, getListingById, sendMessage, markMessagesAsRead, currentUser, markAsSold, addReview, getUserById, getActiveTransactionForListing, createTransaction, updateTransactionStatus, listings } = useStore();
   const { theme } = useTheme();
   const { showToast } = useToast();
   
@@ -74,6 +74,13 @@ const Chat = () => {
       window.visualViewport.addEventListener('resize', () => scrollToBottom("auto"));
     }
   }, []);
+
+  // Mark messages as read when conversation is opened
+  useEffect(() => {
+    if (id) {
+      markMessagesAsRead(id);
+    }
+  }, [id, markMessagesAsRead]);
 
   useEffect(() => {
     if (listing && showBundleModal) {
