@@ -170,14 +170,19 @@ Components:
 ## Environment Variables
 
 ```
-VITE_SUPABASE_URL=       # Supabase project URL
-VITE_SUPABASE_ANON_KEY=  # Supabase anon key
+# Frontend (VITE_ prefixed - exposed to browser)
+VITE_SUPABASE_URL=           # Supabase project URL
+VITE_SUPABASE_ANON_KEY=      # Supabase anon key
 VITE_STRIPE_PUBLISHABLE_KEY= # Stripe public key
-VITE_GEMINI_API_KEY=     # Google Gemini API key
-VITE_CLOUDINARY_URL=     # Cloudinary upload URL
+VITE_CLOUDINARY_CLOUD_NAME=  # Cloudinary cloud name (default: dgq9mn6uz)
+VITE_CLOUDINARY_UPLOAD_PRESET= # Cloudinary preset (default: cradle_uploads)
 
-# Server-side only (not VITE_ prefixed)
-STRIPE_SECRET_KEY=       # Stripe secret key
+# Server-side only (not VITE_ prefixed - for API routes)
+STRIPE_SECRET_KEY=           # Stripe secret key
+STRIPE_WEBHOOK_SECRET=       # Stripe webhook signing secret (whsec_...)
+GROQ_API_KEY=                # Groq API key for deal analysis
+SUPABASE_SERVICE_ROLE_KEY=   # Supabase service role key (for webhooks)
+
 ```
 
 ## Testing Checklist

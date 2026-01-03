@@ -368,6 +368,59 @@ export const StoreProvider = ({ children }: { children?: ReactNode }) => {
     restoreSession();
   }, []);
 
+  // --- Auth State Listener (handles token refresh, sign out from other tabs) ---
+  useEffect(() => {
+    if (!supabase) return;
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('[Auth] State change:', event);
+
+      if (event === 'SIGNED_OUT') {
+        // User signed out (possibly from another tab)
+        setCurrentUser(null);
+        localStorage.removeItem(STORAGE_KEYS.USER);
+      } else if (event === 'TOKEN_REFRESHED') {
+        console.log('[Auth] Token refreshed');
+      } else if (event === 'SIGNED_IN' && session?.user && !currentUser) {
+        // User signed in (possibly from another tab)
+        const profile = await getUserProfile(session.user.id);
+        if (profile) {
+          const restoredUser: User = {
+            id: profile.id,
+            name: profile.username || 'User',
+            location: profile.location_zip || '',
+            isVerifiedParent: profile.is_verified_parent || false,
+            isPremium: profile.is_premium || false,
+            isAdmin: profile.is_admin || false,
+            joinDate: profile.created_at,
+            itemsSold: profile.items_sold || 0,
+            avatarUrl: profile.avatar_url || '',
+            bio: profile.bio,
+            email: profile.email,
+            savedListingIds: profile.saved_listing_ids || [],
+            savedSearches: profile.saved_searches || [],
+            followingIds: profile.following_ids || [],
+            stripeAccountId: profile.stripe_account_id,
+            stripeOnboarded: profile.stripe_onboarded || false,
+            referralCode: profile.referral_code,
+            referredBy: profile.referred_by,
+            referralCredit: profile.referral_credit || 0,
+            referralCount: profile.referral_count || 0,
+            neighborhood: profile.neighborhood,
+            kidAges: profile.kid_ages || [],
+            parentingTags: profile.parenting_tags || []
+          };
+          setCurrentUser(restoredUser);
+          localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(restoredUser));
+        }
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [currentUser]);
+
   // --- Persistence to localStorage (fallback) ---
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.LISTINGS, JSON.stringify(listings)); }, [listings]);
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.CONVERSATIONS, JSON.stringify(conversations)); }, [conversations]);
