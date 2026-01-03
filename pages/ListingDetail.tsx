@@ -7,6 +7,7 @@ import { useToast } from '../context/ToastContext';
 import { ChevronLeft, Share2, Heart, MapPin, UserCheck, MessageCircle, Cigarette, Dog, Shield, Pencil, CheckCircle, Trash2, ChevronRight, Flag, ShoppingBag, ExternalLink, Sparkles, Loader2, TrendingUp, DollarSign, Home, X, ScanLine, ShieldCheck } from 'lucide-react';
 import SafetyBadge from '../components/SafetyBadge';
 import ImageWithSkeleton from '../components/ImageWithSkeleton';
+import AuthModal from '../components/AuthModal';
 import { analyzeDeal } from '../services/geminiService';
 import { DealAnalysis } from '../types';
 
@@ -23,6 +24,8 @@ const ListingDetail = () => {
   const [analyzing, setAnalyzing] = useState(false);
   const [dealAnalysis, setDealAnalysis] = useState<DealAnalysis | null>(null);
   const [showSafetyModal, setShowSafetyModal] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [pendingAction, setPendingAction] = useState<'message' | 'buy' | 'favorite' | null>(null);
 
   // Swipe Gesture State
   const touchStart = useRef<number | null>(null);
@@ -90,18 +93,24 @@ const ListingDetail = () => {
   };
 
   const handleMessageSeller = async () => {
+    if (!currentUser) {
+      setPendingAction('message');
+      setShowAuthModal(true);
+      return;
+    }
     const conversationId = await startConversation(listing.id);
     navigate(`/chat/${conversationId}`);
   };
 
   const handleRequestToBuy = async () => {
     if (!currentUser) {
-        navigate('/welcome');
-        return;
+      setPendingAction('buy');
+      setShowAuthModal(true);
+      return;
     }
     if (activeTransaction) {
-        navigate(`/transaction/${activeTransaction.id}`);
-        return;
+      navigate(`/transaction/${activeTransaction.id}`);
+      return;
     }
 
     // 1. Create the Transaction record
@@ -113,6 +122,19 @@ const ListingDetail = () => {
 
     showToast("Request sent! Seller notified in chat.", "success");
     navigate(`/transaction/${txId}`);
+  };
+
+  // Handle auth success - execute pending action
+  const handleAuthSuccess = () => {
+    if (pendingAction === 'message') {
+      handleMessageSeller();
+    } else if (pendingAction === 'buy') {
+      handleRequestToBuy();
+    } else if (pendingAction === 'favorite') {
+      toggleFavorite(listing.id);
+      showToast('Added to favorites', 'success');
+    }
+    setPendingAction(null);
   };
 
   const handleMarkSold = () => {
@@ -131,6 +153,11 @@ const ListingDetail = () => {
   };
 
   const handleToggleFavorite = () => {
+    if (!currentUser) {
+      setPendingAction('favorite');
+      setShowAuthModal(true);
+      return;
+    }
     toggleFavorite(listing.id);
     showToast(isFavorite ? 'Removed from favorites' : 'Added to favorites', 'success');
   };
@@ -518,6 +545,16 @@ const ListingDetail = () => {
            </div>
         </div>
       )}
+
+      {/* Auth Modal */}
+      <AuthModal
+        isOpen={showAuthModal}
+        onClose={() => {
+          setShowAuthModal(false);
+          setPendingAction(null);
+        }}
+        onSuccess={handleAuthSuccess}
+      />
     </div>
   );
 };

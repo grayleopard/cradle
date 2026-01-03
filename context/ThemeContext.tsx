@@ -1,7 +1,8 @@
+import React, { createContext, useContext, ReactNode } from 'react';
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-
-export type Theme = 'default' | 'midnight' | 'retro' | 'heirloom';
+// Simplified theme - always heirloom
+// Other themes can be added back later as a premium feature
+export type Theme = 'heirloom';
 
 interface ThemeContextType {
   theme: Theme;
@@ -10,19 +11,13 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
-// Ensure children is typed as optional to satisfy usage sites without explicit prop passed
 export const ThemeProvider = ({ children }: { children?: ReactNode }) => {
-  const [theme, setThemeState] = useState<Theme>(() => {
-    return (localStorage.getItem('cradle_theme') as Theme) || 'heirloom';
-  });
+  // Always use heirloom theme
+  const theme: Theme = 'heirloom';
 
-  useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('cradle_theme', theme);
-  }, [theme]);
-
-  const setTheme = (newTheme: Theme) => {
-    setThemeState(newTheme);
+  // No-op for now - can be expanded later for dark mode or premium themes
+  const setTheme = (_newTheme: Theme) => {
+    // Theme switching disabled for MVP
   };
 
   return (

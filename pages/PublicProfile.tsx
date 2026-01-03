@@ -6,15 +6,18 @@ import { ChevronLeft, UserCheck, MapPin, Calendar, Star, Crown, UserPlus, Check,
 import ListingCard from '../components/ListingCard';
 import { summarizeUserReputation } from '../services/geminiService';
 import { useToast } from '../context/ToastContext';
+import AuthModal from '../components/AuthModal';
 
 const PublicProfile = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { getUserById, listings, getReviewsByUserId, currentUser, followUser, unfollowUser } = useStore();
   const { showToast } = useToast();
-  
+
   const [reputationSummary, setReputationSummary] = useState<string | null>(null);
   const [loadingSummary, setLoadingSummary] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [pendingFollow, setPendingFollow] = useState(false);
 
   const user = getUserById(id || '');
   const userListings = listings.filter(l => l.userId === id && !l.isSold);
@@ -44,11 +47,22 @@ const PublicProfile = () => {
   if (!user) return <div className="p-4">User not found</div>;
 
   const handleFollowToggle = () => {
-    if (!currentUser) return navigate('/welcome');
+    if (!currentUser) {
+      setPendingFollow(true);
+      setShowAuthModal(true);
+      return;
+    }
     if (isFollowing) {
       unfollowUser(user.id);
     } else {
       followUser(user.id);
+    }
+  };
+
+  const handleAuthSuccess = () => {
+    if (pendingFollow && user) {
+      followUser(user.id);
+      setPendingFollow(false);
     }
   };
 
@@ -212,6 +226,13 @@ const PublicProfile = () => {
           )}
         </div>
       </div>
+
+      {/* Auth Modal */}
+      <AuthModal
+        isOpen={showAuthModal}
+        onClose={() => { setShowAuthModal(false); setPendingFollow(false); }}
+        onSuccess={handleAuthSuccess}
+      />
     </div>
   );
 };

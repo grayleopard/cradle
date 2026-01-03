@@ -16,7 +16,6 @@ import ParentVerification from './pages/ParentVerification';
 import PublicProfile from './pages/PublicProfile';
 import Inbox from './pages/Inbox';
 import Chat from './pages/Chat';
-import Welcome from './pages/Welcome';
 import SafetyCheck from './pages/SafetyCheck';
 import Premium from './pages/Premium';
 import Transaction from './pages/Transaction';
@@ -28,21 +27,28 @@ import Compare from './pages/Compare';
 const ProtectedRoute = ({ children }: { children?: React.ReactNode }) => {
   const { currentUser } = useStore();
   if (!currentUser) {
-    return <Navigate to="/welcome" replace />;
+    return <Navigate to="/" replace />;
   }
   return <Layout>{children}</Layout>;
 };
 
-const AppRoutes = () => {
-  const { currentUser } = useStore();
+// Wrapper for public routes (viewable without auth, still use Layout)
+const PublicRoute = ({ children }: { children?: React.ReactNode }) => {
+  return <Layout>{children}</Layout>;
+};
 
+const AppRoutes = () => {
   return (
     <Routes>
-      <Route path="/welcome" element={currentUser ? <Navigate to="/" /> : <Welcome />} />
-      
-      <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
-      <Route path="/listing/:id" element={<ProtectedRoute><ListingDetail /></ProtectedRoute>} />
-      <Route path="/user/:id" element={<ProtectedRoute><PublicProfile /></ProtectedRoute>} />
+      {/* Redirect old welcome page to home */}
+      <Route path="/welcome" element={<Navigate to="/" replace />} />
+
+      {/* Public routes - viewable without auth */}
+      <Route path="/" element={<PublicRoute><Home /></PublicRoute>} />
+      <Route path="/listing/:id" element={<PublicRoute><ListingDetail /></PublicRoute>} />
+      <Route path="/user/:id" element={<PublicRoute><PublicProfile /></PublicRoute>} />
+
+      {/* Protected routes - require authentication */}
       <Route path="/sell" element={<ProtectedRoute><CreateListing /></ProtectedRoute>} />
       <Route path="/edit/:id" element={<ProtectedRoute><CreateListing /></ProtectedRoute>} />
       <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />

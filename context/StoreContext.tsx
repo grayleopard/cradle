@@ -336,7 +336,7 @@ export const StoreProvider = ({ children }: { children?: ReactNode }) => {
     if (supabase) await supabase.auth.signOut();
     setCurrentUser(null);
     localStorage.removeItem(STORAGE_KEYS.USER);
-    window.location.href = '/#/welcome';
+    window.location.href = '/#/';
   };
 
   const updateUser = async (updatedUser: User) => {
