@@ -4,6 +4,7 @@ import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { StoreProvider, useStore } from './context/StoreContext';
 import { ToastProvider } from './context/ToastContext';
 import { ThemeProvider } from './context/ThemeContext';
+import { StripeProvider } from './context/StripeContext';
 import ToastContainer from './components/ToastContainer';
 import { Layout } from './components/Layout';
 import Home from './pages/Home';
@@ -66,10 +67,12 @@ const App = () => {
     <ThemeProvider>
       <ToastProvider>
         <StoreProvider>
-          <Router>
-            <AppRoutes />
-            <ToastContainer />
-          </Router>
+          <StripeProvider>
+            <Router>
+              <AppRoutes />
+              <ToastContainer />
+            </Router>
+          </StripeProvider>
         </StoreProvider>
       </ToastProvider>
     </ThemeProvider>

@@ -6,7 +6,9 @@ import { useToast } from '../context/ToastContext';
 import { TransactionStatus, Review } from '../types';
 import { ChevronLeft, Lock, ShieldCheck, CheckCircle, MapPin, Clock, CreditCard, Camera, AlertTriangle, UserCheck, Sparkles, ExternalLink, X, RotateCcw, Loader2, FileText, Star, Download, XCircle } from 'lucide-react';
 import SafetyBadge from '../components/SafetyBadge';
+import StripePaymentForm from '../components/StripePaymentForm';
 import { generateInspectionChecklist } from '../services/geminiService';
+import { capturePayment, cancelPayment } from '../services/stripeService';
 import { processImage } from '../utils/fileHelpers';
 import { uploadToCloudinary } from '../services/cloudinaryService';
 
@@ -46,6 +48,8 @@ const Transaction = () => {
 
   const isBuyer = currentUser?.id === transaction.buyerId;
   const otherUser = getUserById(isBuyer ? transaction.sellerId : transaction.buyerId);
+  const seller = getUserById(transaction.sellerId);
+  const sellerStripeAccountId = seller?.stripeAccountId;
 
   // Trigger confetti when completed
   useEffect(() => {
@@ -83,17 +87,12 @@ const Transaction = () => {
     showToast("Request accepted! Waiting for buyer payment.");
   };
 
-  const handleProcessPayment = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handlePaymentSuccess = (paymentIntentId: string) => {
     setShowPaymentModal(false);
-    setLoading(true);
-    
-    // Simulate Stripe processing
-    setTimeout(() => {
-      setLoading(false);
-      updateTransactionStatus(transaction.id, TransactionStatus.PAYMENT_HELD);
-      showToast("Payment secured in escrow!");
-    }, 2000);
+    updateTransactionStatus(transaction.id, TransactionStatus.PAYMENT_HELD, {
+      stripePaymentIntentId: paymentIntentId
+    });
+    showToast("Payment secured in escrow!");
   };
 
   const handleConfirmMeetup = () => {
@@ -143,32 +142,50 @@ const Transaction = () => {
     try {
       // 1. Upload photo to Cloudinary
       const remotePhotoUrl = await uploadToCloudinary(photoBlob);
-      
-      // 2. Update Transaction
+
+      // 2. Capture the Stripe payment (release funds to seller)
+      if (transaction.stripePaymentIntentId) {
+        await capturePayment(transaction.stripePaymentIntentId);
+      }
+
+      // 3. Update Transaction
       updateTransactionStatus(transaction.id, TransactionStatus.COMPLETED, {
         inspectionChecklist: {
-          matchesDescription: true, // simplified for storage
+          matchesDescription: true,
           conditionAcceptable: true,
           noUndisclosedDamage: true
         },
         inspectionPhotoUrl: remotePhotoUrl
       });
-      showToast("Transaction Complete! Funds released.");
+      showToast("Transaction Complete! Funds released to seller.");
     } catch (e) {
       console.error(e);
-      showToast("Failed to upload proof photo. Try again.", "error");
+      showToast("Failed to complete transaction. Try again.", "error");
     } finally {
       setLoading(false);
       setUploadingPhoto(false);
     }
   };
 
-  const handleRejectTransaction = () => {
+  const handleRejectTransaction = async () => {
     if (!rejectReason) return;
-    // For MVP, we treat rejection during inspection as a Cancellation (refund buyer)
-    updateTransactionStatus(transaction.id, TransactionStatus.CANCELLED);
-    setShowRejectModal(false);
-    showToast("Transaction cancelled. Payment will be refunded.");
+
+    setLoading(true);
+    try {
+      // Cancel the Stripe payment (refund buyer)
+      if (transaction.stripePaymentIntentId) {
+        await cancelPayment(transaction.stripePaymentIntentId);
+      }
+
+      updateTransactionStatus(transaction.id, TransactionStatus.CANCELLED);
+      setShowRejectModal(false);
+      showToast("Transaction cancelled. Payment will be refunded.");
+    } catch (e) {
+      console.error(e);
+      showToast("Failed to cancel transaction. Please contact support.", "error");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSubmitReview = () => {
@@ -537,42 +554,47 @@ const Transaction = () => {
       </div>
 
       {/* Payment Modal */}
-      {showPaymentModal && (
+      {showPaymentModal && sellerStripeAccountId && (
+        <div className="absolute inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center p-4 animate-in fade-in">
+           <div className="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl animate-in slide-in-from-bottom-10 max-h-[90vh] overflow-y-auto">
+              <div className="flex justify-between items-center mb-4">
+                 <h3 className="text-lg font-bold text-gray-900">Secure Payment</h3>
+                 <button onClick={() => setShowPaymentModal(false)} className="p-1 hover:bg-gray-100 rounded-full"><X className="w-5 h-5 text-gray-500" /></button>
+              </div>
+
+              <StripePaymentForm
+                amount={transaction.amount}
+                platformFee={transaction.platformFee}
+                total={transaction.total}
+                sellerAccountId={sellerStripeAccountId}
+                transactionId={transaction.id}
+                listingTitle={listing.title}
+                onSuccess={handlePaymentSuccess}
+                onCancel={() => setShowPaymentModal(false)}
+              />
+           </div>
+        </div>
+      )}
+
+      {/* Seller not onboarded warning */}
+      {showPaymentModal && !sellerStripeAccountId && (
         <div className="absolute inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center p-4 animate-in fade-in">
            <div className="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl animate-in slide-in-from-bottom-10">
               <div className="flex justify-between items-center mb-4">
-                 <h3 className="text-lg font-bold text-gray-900">Add Payment Method</h3>
+                 <h3 className="text-lg font-bold text-gray-900">Payment Unavailable</h3>
                  <button onClick={() => setShowPaymentModal(false)} className="p-1 hover:bg-gray-100 rounded-full"><X className="w-5 h-5 text-gray-500" /></button>
               </div>
-              
-              <form onSubmit={handleProcessPayment} className="space-y-4">
-                 <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Card Number</label>
-                    <div className="relative">
-                       <CreditCard className="absolute left-3 top-3 text-gray-400 w-5 h-5" />
-                       <input autoFocus required type="text" placeholder="0000 0000 0000 0000" className="w-full pl-10 p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none font-mono" />
-                    </div>
-                 </div>
-                 <div className="flex gap-3">
-                    <div className="flex-1">
-                       <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Expiry</label>
-                       <input required type="text" placeholder="MM/YY" className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none font-mono text-center" />
-                    </div>
-                    <div className="flex-1">
-                       <label className="block text-xs font-bold text-gray-500 uppercase mb-1">CVC</label>
-                       <input required type="text" placeholder="123" className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none font-mono text-center" />
-                    </div>
-                 </div>
-                 
-                 <div className="bg-brand-50 p-3 rounded-lg text-xs text-brand-800 flex items-start gap-2">
-                    <Lock className="w-3 h-3 mt-0.5 flex-shrink-0" />
-                    <p>Your payment of <strong>${transaction.total}</strong> will be held in escrow until you inspect and accept the item.</p>
-                 </div>
-
-                 <button className="w-full py-3 bg-black text-white font-bold rounded-xl shadow-lg hover:bg-gray-800 transition-colors">
-                    Pay Now
-                 </button>
-              </form>
+              <div className="bg-yellow-50 border border-yellow-100 rounded-lg p-4 mb-4">
+                <p className="text-sm text-yellow-800">
+                  The seller hasn't set up their payment account yet. Please contact them through chat to arrange payment.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowPaymentModal(false)}
+                className="w-full py-3 bg-gray-100 text-gray-700 font-bold rounded-xl"
+              >
+                Close
+              </button>
            </div>
         </div>
       )}

@@ -99,9 +99,12 @@ const mapUserFromDB = (row: any): User => ({
   avatarUrl: row.avatar_url || '',
   location: row.location_zip || '',
   bio: row.bio,
+  email: row.email,
   savedListingIds: row.saved_listing_ids || [],
   savedSearches: row.saved_searches || [],
-  followingIds: row.following_ids || []
+  followingIds: row.following_ids || [],
+  stripeAccountId: row.stripe_account_id,
+  stripeOnboarded: row.stripe_onboarded || false
 });
 
 const mapListingFromDB = (row: any): Listing => ({
@@ -168,6 +171,7 @@ const mapTransactionFromDB = (row: any): Transaction => ({
   platformFee: Number(row.platform_fee),
   total: Number(row.total),
   status: row.status as TransactionStatus,
+  stripePaymentIntentId: row.stripe_payment_intent_id,
   meetupLocation: row.meetup_location,
   meetupTime: row.meetup_time,
   inspectionPhotoUrl: row.inspection_photo_url,
@@ -311,6 +315,7 @@ export const StoreProvider = ({ children }: { children?: ReactNode }) => {
       await supabase.from('users').upsert({
         id: user.id,
         username: user.name,
+        email: user.email,
         location_zip: user.location,
         is_verified_parent: user.isVerifiedParent,
         is_premium: user.isPremium,
@@ -320,7 +325,9 @@ export const StoreProvider = ({ children }: { children?: ReactNode }) => {
         bio: user.bio,
         saved_listing_ids: user.savedListingIds || [],
         saved_searches: user.savedSearches || [],
-        following_ids: user.followingIds || []
+        following_ids: user.followingIds || [],
+        stripe_account_id: user.stripeAccountId,
+        stripe_onboarded: user.stripeOnboarded
       });
     }
   };
@@ -341,6 +348,7 @@ export const StoreProvider = ({ children }: { children?: ReactNode }) => {
       await supabase.from('users').upsert({
         id: updatedUser.id,
         username: updatedUser.name,
+        email: updatedUser.email,
         location_zip: updatedUser.location,
         is_verified_parent: updatedUser.isVerifiedParent,
         is_premium: updatedUser.isPremium,
@@ -350,7 +358,9 @@ export const StoreProvider = ({ children }: { children?: ReactNode }) => {
         bio: updatedUser.bio,
         saved_listing_ids: updatedUser.savedListingIds || [],
         saved_searches: updatedUser.savedSearches || [],
-        following_ids: updatedUser.followingIds || []
+        following_ids: updatedUser.followingIds || [],
+        stripe_account_id: updatedUser.stripeAccountId,
+        stripe_onboarded: updatedUser.stripeOnboarded
       });
     }
   };
@@ -739,6 +749,7 @@ export const StoreProvider = ({ children }: { children?: ReactNode }) => {
     if (supabase) {
       await supabase.from('transactions').update({
         status,
+        stripe_payment_intent_id: updates?.stripePaymentIntentId,
         meetup_location: updates?.meetupLocation,
         meetup_time: updates?.meetupTime,
         inspection_photo_url: updates?.inspectionPhotoUrl,

@@ -56,18 +56,21 @@ export interface User {
   name: string;
   isVerifiedParent: boolean;
   isPremium?: boolean;
-  isAdmin?: boolean; // New Admin Role
+  isAdmin?: boolean;
   joinDate: string;
   itemsSold: number;
   avatarUrl: string;
   location: string;
   bio?: string;
+  email?: string;
   savedListingIds?: string[];
-  savedSearches?: SavedSearch[]; // New Field
-  followingIds?: string[]; // Community Feature
+  savedSearches?: SavedSearch[];
+  followingIds?: string[];
   followersCount?: number;
   rating?: number;
   reviewCount?: number;
+  stripeAccountId?: string; // Stripe Connect account for sellers
+  stripeOnboarded?: boolean; // Has completed Stripe onboarding
 }
 
 export interface Review {
@@ -162,11 +165,14 @@ export interface Transaction {
   platformFee: number;
   total: number;
   status: TransactionStatus;
-  
+
+  // Stripe Payment
+  stripePaymentIntentId?: string;
+
   // Meeting Details
   meetupLocation?: string;
   meetupTime?: string;
-  
+
   // Inspection Data
   inspectionPhotoUrl?: string;
   inspectionChecklist?: {
@@ -174,7 +180,7 @@ export interface Transaction {
     conditionAcceptable: boolean;
     noUndisclosedDamage: boolean;
   };
-  
+
   createdAt: string;
   updatedAt: string;
 }
