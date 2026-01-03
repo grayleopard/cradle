@@ -5,6 +5,7 @@ import { useTheme, Theme } from '../context/ThemeContext';
 import { UserCheck, MapPin, Calendar, Package, Trash2, CheckCircle, LogOut, ShieldAlert, Pencil, Heart, ScanLine, ChevronRight, Crown, BarChart2, Database, Settings, Bell, Search, RefreshCw, ShoppingBag, Clock, TrendingUp, Eye, DollarSign, Palette, Moon, Sun, Layers, Leaf } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import ListingCard from '../components/ListingCard';
+import StripeOnboarding from '../components/StripeOnboarding';
 import { isSupabaseConfigured } from '../services/supabase';
 import { useToast } from '../context/ToastContext';
 
@@ -164,6 +165,11 @@ const Profile = () => {
                           <Package className="w-4 h-4 text-green-500 opacity-50" />
                        </div>
                     </div>
+                 </div>
+
+                 {/* Stripe Connect Onboarding */}
+                 <div className="mt-4">
+                    <StripeOnboarding />
                  </div>
               </div>
            </div>
