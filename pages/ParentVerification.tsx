@@ -137,7 +137,7 @@ const ParentVerification = () => {
             </div>
             <h2 className="text-2xl font-bold text-gray-900 mb-3">You're Verified!</h2>
             <p className="text-gray-500 mb-8">
-              Thank you for helping keep Cradle safe. Your profile has been updated.
+              Thank you for helping keep Pipit safe. Your profile has been updated.
             </p>
             <button 
               onClick={() => navigate('/profile')}

@@ -164,8 +164,8 @@ const ListingDetail = () => {
 
   const handleShare = async () => {
     const shareData = {
-      title: `Check out this ${listing.title} on Cradle`,
-      text: `I found this ${listing.title} for $${listing.price} on Cradle - the safest way to buy baby gear!`,
+      title: `Check out this ${listing.title} on Pipit`,
+      text: `I found this ${listing.title} for $${listing.price} on Pipit - the safest way to buy baby gear!`,
       url: window.location.href,
     };
 
@@ -513,7 +513,7 @@ const ListingDetail = () => {
                  <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-4 ${isHeirloom ? 'bg-white border border-[#E3D5CA]' : 'bg-brand-100'}`}>
                     <ShieldCheck className={`w-8 h-8 ${isHeirloom ? 'text-[#C68E68]' : 'text-brand-600'}`} />
                  </div>
-                 <h3 className="text-xl font-bold text-gray-900 mb-2">The Cradle Safety Promise</h3>
+                 <h3 className="text-xl font-bold text-gray-900 mb-2">The Pipit Safety Promise</h3>
                  <p className="text-sm text-gray-500 leading-relaxed">
                     We use Google Gemini AI to analyze every listing against thousands of safety recalls.
                  </p>

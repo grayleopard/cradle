@@ -81,11 +81,11 @@ export const Layout = ({ children }: { children?: React.ReactNode }) => {
               {/* Logo */}
               <Link to="/" className="flex items-center gap-3">
                 <div className="w-9 h-9 flex items-center justify-center text-white font-bold text-lg rounded-xl bg-[#C68E68]">
-                  H
+                  P
                 </div>
                 <div>
                   <h1 className="font-bold text-lg leading-tight text-[#2F3E2E] font-serif">
-                    Heirloom
+                    Pipit
                   </h1>
                 </div>
               </Link>
@@ -182,7 +182,7 @@ export const Layout = ({ children }: { children?: React.ReactNode }) => {
         <header className="lg:hidden sticky top-0 z-50 px-4 py-3 flex items-center justify-between border-b backdrop-blur-md bg-[#F9F6F0] border-[#E3D5CA]">
           <div className="flex items-center gap-2">
             {location.pathname !== '/' && (
-              <h1 className="font-serif text-xl text-[#2F3E2E]">Heirloom Exchange</h1>
+              <h1 className="font-serif text-xl text-[#2F3E2E]">Pipit</h1>
             )}
           </div>
         </header>

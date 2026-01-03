@@ -68,8 +68,8 @@ const PublicProfile = () => {
 
   const handleShare = async () => {
     const shareData = {
-        title: `${user.name}'s Shop on Cradle`,
-        text: `Check out items from ${user.name} on Cradle - the safest marketplace for parents.`,
+        title: `${user.name}'s Shop on Pipit`,
+        text: `Check out items from ${user.name} on Pipit - the safest marketplace for parents.`,
         url: window.location.href,
     };
 

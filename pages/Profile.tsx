@@ -73,7 +73,7 @@ const Profile = () => {
         <Link to="/profile/premium" className={`block rounded-xl p-4 mb-4 flex items-center gap-3 transition-all relative overflow-hidden group ${currentUser.isPremium ? 'bg-gray-900 text-white' : 'bg-gradient-to-r from-gray-900 to-gray-800 text-white shadow-lg'}`}>
           <div className={`p-2 rounded-full ${currentUser.isPremium ? 'bg-white/10' : 'bg-yellow-400/20'}`}><Crown className={`w-5 h-5 ${currentUser.isPremium ? 'text-yellow-400' : 'text-yellow-400'}`} /></div>
           <div className="flex-1">
-            <h3 className="font-bold text-sm">{currentUser.isPremium ? 'Cradle+ Member' : 'Upgrade to Cradle+'}</h3>
+            <h3 className="font-bold text-sm">{currentUser.isPremium ? 'Pipit+ Member' : 'Upgrade to Pipit+'}</h3>
             <p className="text-xs opacity-80 mt-0.5">{currentUser.isPremium ? 'You have access to premium features.' : 'Get priority listings & more.'}</p>
           </div>
           {!currentUser.isPremium && <ChevronRight className="w-5 h-5 opacity-60 group-hover:translate-x-1 transition-transform" />}

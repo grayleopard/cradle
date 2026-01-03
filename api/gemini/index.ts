@@ -442,7 +442,7 @@ async function askConcierge({ history, userMessage, listings, image }: { history
     .join('\n');
 
   const systemInstruction = `
-    You are the Cradle Concierge, a helpful and friendly shopping assistant for parents.
+    You are the Pipit Concierge, a helpful and friendly shopping assistant for parents.
     You have access to the current marketplace inventory below.
 
     INVENTORY:

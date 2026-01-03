@@ -18,7 +18,7 @@ const Concierge = () => {
   
   // Chat State
   const [messages, setMessages] = useState<{ role: 'user' | 'model'; text: string; recommendedIds?: string[] }[]>([
-    { role: 'model', text: "Hi! I'm the Cradle Concierge. I can help you find gear, compare prices, or check safety. Upload a photo or ask me anything!" }
+    { role: 'model', text: "Hi! I'm the Pipit Concierge. I can help you find gear, compare prices, or check safety. Upload a photo or ask me anything!" }
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -198,7 +198,7 @@ const Concierge = () => {
                 {isLiveMode ? <Headphones className="w-5 h-5 animate-pulse" /> : <Sparkles className="w-5 h-5" />}
              </div>
              <div>
-               <h3 className="font-bold text-sm">Cradle {isLiveMode ? 'Live' : 'Concierge'}</h3>
+               <h3 className="font-bold text-sm">Pipit {isLiveMode ? 'Live' : 'Concierge'}</h3>
                <p className="text-[10px] opacity-80">{isLiveMode ? 'Real-time Voice' : 'AI Shopping Assistant'}</p>
              </div>
           </div>

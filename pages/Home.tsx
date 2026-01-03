@@ -170,8 +170,8 @@ const Home = () => {
         {/* Header Branding - Mobile only, desktop has top nav */}
         <div className="px-4 lg:px-8 mb-3 lg:hidden">
           <div className="flex items-center gap-2">
-            <Scissors className="w-6 h-6 text-[#2F3E2E]" />
-            <h1 className="font-serif text-2xl text-[#2F3E2E] tracking-tight">Heirloom Exchange</h1>
+            <div className="w-7 h-7 flex items-center justify-center text-white font-bold text-sm rounded-lg bg-[#C68E68]">P</div>
+            <h1 className="font-serif text-2xl text-[#2F3E2E] tracking-tight">Pipit</h1>
           </div>
         </div>
 

@@ -213,7 +213,7 @@ const Chat = () => {
     const loc = activeTransaction?.meetupLocation || detectedPlan?.location || '';
     const time = activeTransaction?.meetupTime || detectedPlan?.dateTime || '';
     
-    const text = `Cradle Meetup: ${listing.title}`;
+    const text = `Pipit Meetup: ${listing.title}`;
     const details = `Meeting with ${otherUser?.name}. Location: ${loc}`;
     const url = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(text)}&details=${encodeURIComponent(details)}&location=${encodeURIComponent(loc)}`;
     window.open(url, '_blank');
@@ -298,14 +298,14 @@ const Chat = () => {
              <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0" />
              <div className="text-xs text-red-800">
                <span className="font-bold block mb-1">Safety Warning</span>
-               Transactions outside Cradle are not protected. Avoid using Venmo/CashApp or sharing phone numbers before meeting.
+               Transactions outside Pipit are not protected. Avoid using Venmo/CashApp or sharing phone numbers before meeting.
              </div>
           </div>
         )}
 
         <div className={`border rounded-lg p-3 flex gap-3 text-xs mb-6 mx-auto max-w-sm ${isHeirloom ? 'bg-white border-[#E3D5CA] text-[#5C5C5C]' : 'bg-blue-50 border-blue-100 text-blue-800'}`}>
           <Shield className={`w-5 h-5 flex-shrink-0 ${isHeirloom ? 'text-[#C68E68]' : 'text-blue-500'}`} />
-          <p>Keep conversations on Cradle until you meet. Suggested meetup: <strong>Auburn SuperMall</strong>.</p>
+          <p>Keep conversations on Pipit until you meet. Suggested meetup: <strong>Auburn SuperMall</strong>.</p>
         </div>
 
         {messages.length === 0 && <div className="text-center text-gray-400 text-xs py-4">Start the conversation...</div>}

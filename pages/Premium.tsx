@@ -11,7 +11,7 @@ const Premium = () => {
 
   const handleUpgrade = () => {
     upgradeToPremium();
-    showToast("Welcome to Cradle+!", "success");
+    showToast("Welcome to Pipit+!", "success");
     setTimeout(() => navigate('/profile'), 1000);
   };
 
@@ -27,7 +27,7 @@ const Premium = () => {
         <button onClick={() => navigate(-1)} className="p-2 hover:bg-white/10 rounded-full text-white">
           <ChevronLeft className="w-6 h-6" />
         </button>
-        <span className="font-bold tracking-wide">Cradle+</span>
+        <span className="font-bold tracking-wide">Pipit+</span>
       </div>
 
       <div className="flex-1 p-8 flex flex-col items-center relative z-10">
@@ -35,7 +35,7 @@ const Premium = () => {
           <Crown className="w-12 h-12 text-white" />
         </div>
 
-        <h1 className="text-3xl font-bold text-center mb-2">Sell Faster with<br/>Cradle+</h1>
+        <h1 className="text-3xl font-bold text-center mb-2">Sell Faster with<br/>Pipit+</h1>
         <p className="text-gray-400 text-center mb-10 text-sm max-w-xs leading-relaxed">
           Unlock premium tools to boost your listings and build trust instantly.
         </p>
@@ -75,7 +75,7 @@ const Premium = () => {
         <div className="mt-auto w-full">
           {currentUser.isPremium ? (
              <div className="bg-green-500/20 border border-green-500/50 p-4 rounded-xl text-center text-green-400 font-bold mb-4">
-                You are a Cradle+ Member
+                You are a Pipit+ Member
              </div>
           ) : (
             <button 
