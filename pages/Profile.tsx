@@ -1,14 +1,15 @@
 
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
-import { UserCheck, MapPin, Calendar, Package, Trash2, CheckCircle, LogOut, Pencil, Heart, ChevronRight, Crown, BarChart2, Settings, Bell, ShoppingBag, Eye, DollarSign } from 'lucide-react';
+import { UserCheck, MapPin, Calendar, Package, Trash2, CheckCircle, LogOut, Pencil, Heart, ChevronRight, Crown, BarChart2, Settings, Bell, ShoppingBag, Eye, DollarSign, Clock, Search, AlertCircle, ArrowRight } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import ListingCard from '../components/ListingCard';
 import StripeOnboarding from '../components/StripeOnboarding';
 import { useToast } from '../context/ToastContext';
+import { TransactionStatus } from '../types';
 
 const Profile = () => {
-  const { currentUser, listings, transactions, markAsSold, deleteListing, logout } = useStore();
+  const { currentUser, listings, transactions, markAsSold, deleteListing, deleteSavedSearch, logout } = useStore();
   const navigate = useNavigate();
   const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState<'selling' | 'buying' | 'saved' | 'alerts'>('selling');
@@ -30,6 +31,43 @@ const Profile = () => {
        return { transaction: t, listing };
     })
     .filter(item => item.listing !== undefined);
+
+  // Saved searches
+  const savedSearches = currentUser.savedSearches || [];
+
+  // Helper to get status display
+  const getStatusBadge = (status: TransactionStatus) => {
+    switch (status) {
+      case TransactionStatus.INITIATED:
+        return { label: 'Pending', color: 'bg-yellow-100 text-yellow-800' };
+      case TransactionStatus.ACCEPTED:
+        return { label: 'Pay Now', color: 'bg-blue-100 text-blue-800' };
+      case TransactionStatus.PAYMENT_HELD:
+        return { label: 'Paid', color: 'bg-green-100 text-green-800' };
+      case TransactionStatus.MEETUP_AGREED:
+        return { label: 'Meetup Set', color: 'bg-purple-100 text-purple-800' };
+      case TransactionStatus.INSPECTION_PENDING:
+        return { label: 'Inspecting', color: 'bg-indigo-100 text-indigo-800' };
+      case TransactionStatus.COMPLETED:
+        return { label: 'Complete', color: 'bg-gray-100 text-gray-800' };
+      case TransactionStatus.CANCELLED:
+        return { label: 'Cancelled', color: 'bg-red-100 text-red-800' };
+      default:
+        return { label: status, color: 'bg-gray-100 text-gray-600' };
+    }
+  };
+
+  // Count matching listings for a saved search
+  const getMatchCount = (search: { query: string; category: string; minPrice: string; maxPrice: string }) => {
+    return listings.filter(l => {
+      if (l.isSold) return false;
+      if (search.query && !l.title.toLowerCase().includes(search.query.toLowerCase())) return false;
+      if (search.category !== 'All' && l.category !== search.category) return false;
+      if (search.minPrice && l.price < parseInt(search.minPrice)) return false;
+      if (search.maxPrice && l.price > parseInt(search.maxPrice)) return false;
+      return true;
+    }).length;
+  };
 
   return (
     <div className="min-h-full pb-20 bg-[#F9F6F0]">
@@ -202,6 +240,110 @@ const Profile = () => {
                 <div className="text-center py-10 text-gray-400"><Heart className="w-12 h-12 mx-auto mb-3 opacity-20" /><p>No saved items yet.</p><Link to="/" className="text-brand-600 font-medium text-sm mt-2 block">Browse items</Link></div>
               )}
            </div>
+        )}
+
+        {activeTab === 'buying' && (
+          <div className="space-y-3 animate-in fade-in duration-300">
+            {myPurchases.length > 0 ? myPurchases.map(({ transaction, listing }) => {
+              const status = getStatusBadge(transaction.status);
+              return (
+                <Link
+                  key={transaction.id}
+                  to={`/transaction/${transaction.id}`}
+                  className="p-3 flex gap-3 shadow-sm bg-white rounded-[1.5rem] border border-[#E3D5CA] hover:border-[#C68E68] transition-colors block"
+                >
+                  <img src={listing!.images[0]} className="w-20 h-20 rounded-2xl object-cover bg-gray-100" alt={listing!.title} />
+                  <div className="flex-1 flex flex-col justify-between">
+                    <div>
+                      <h4 className="font-medium text-sm line-clamp-1 text-[#2F3E2E]">{listing!.title}</h4>
+                      <span className="text-xs text-gray-500">${transaction.total}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className={`text-[10px] font-bold px-2 py-1 rounded-full ${status.color}`}>
+                        {status.label}
+                      </span>
+                      <div className="flex items-center gap-1 text-xs text-[#C68E68]">
+                        <span>View</span>
+                        <ArrowRight className="w-3 h-3" />
+                      </div>
+                    </div>
+                  </div>
+                </Link>
+              );
+            }) : (
+              <div className="text-center py-10">
+                <ShoppingBag className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                <p className="text-gray-400 mb-2">No purchases yet</p>
+                <Link to="/" className="text-[#C68E68] font-medium text-sm">Start shopping</Link>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'alerts' && (
+          <div className="space-y-3 animate-in fade-in duration-300">
+            {savedSearches.length > 0 ? savedSearches.map(search => {
+              const matchCount = getMatchCount(search);
+              return (
+                <div
+                  key={search.id}
+                  className="p-4 bg-white rounded-[1.5rem] border border-[#E3D5CA] shadow-sm"
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 rounded-full bg-[#F5EBE0]">
+                        <Search className="w-4 h-4 text-[#C68E68]" />
+                      </div>
+                      <div>
+                        <h4 className="font-medium text-sm text-[#2F3E2E]">
+                          {search.query || 'All items'}
+                        </h4>
+                        <p className="text-xs text-gray-400">
+                          {search.category !== 'All' ? search.category : 'Any category'}
+                          {search.minPrice || search.maxPrice ? ` • $${search.minPrice || '0'}-$${search.maxPrice || '∞'}` : ''}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        deleteSavedSearch(search.id);
+                        showToast('Alert removed');
+                      }}
+                      className="p-1.5 rounded-full hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      {matchCount > 0 ? (
+                        <span className="text-xs font-medium text-green-600 bg-green-50 px-2 py-1 rounded-full flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3" />
+                          {matchCount} match{matchCount !== 1 ? 'es' : ''}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-gray-400">No matches yet</span>
+                      )}
+                    </div>
+                    <Link
+                      to={`/?q=${encodeURIComponent(search.query)}&category=${encodeURIComponent(search.category)}`}
+                      className="text-xs font-medium text-[#C68E68] flex items-center gap-1 hover:underline"
+                    >
+                      View results <ArrowRight className="w-3 h-3" />
+                    </Link>
+                  </div>
+                </div>
+              );
+            }) : (
+              <div className="text-center py-10">
+                <Bell className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                <p className="text-gray-400 mb-2">No saved searches</p>
+                <p className="text-xs text-gray-400 max-w-xs mx-auto">
+                  Save a search from the home page to get notified when new items match your criteria.
+                </p>
+              </div>
+            )}
+          </div>
         )}
 
         {/* Admin Link at bottom */}
