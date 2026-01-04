@@ -147,6 +147,7 @@ export const Layout = ({ children }: { children?: React.ReactNode }) => {
                         </div>
                         <Link
                           to="/profile"
+                          onClick={(e) => { e.stopPropagation(); setShowUserMenu(false); }}
                           className="flex items-center gap-2 px-4 py-2 text-sm text-[#4A3F37] hover:bg-[#F5EDE6]"
                         >
                           <UserIcon className="w-4 h-4" />
@@ -154,13 +155,14 @@ export const Layout = ({ children }: { children?: React.ReactNode }) => {
                         </Link>
                         <Link
                           to="/settings/dev"
+                          onClick={(e) => { e.stopPropagation(); setShowUserMenu(false); }}
                           className="flex items-center gap-2 px-4 py-2 text-sm text-[#4A3F37] hover:bg-[#F5EDE6]"
                         >
                           <Settings className="w-4 h-4" />
                           Settings
                         </Link>
                         <button
-                          onClick={logout}
+                          onClick={(e) => { e.stopPropagation(); logout(); }}
                           className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50"
                         >
                           <LogOut className="w-4 h-4" />
