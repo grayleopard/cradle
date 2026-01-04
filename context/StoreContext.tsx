@@ -594,7 +594,15 @@ export const StoreProvider = ({ children }: { children?: ReactNode }) => {
   const logout = async () => {
     await supabaseSignOut();
     setCurrentUser(null);
+    // Clear all user-specific data from localStorage
     localStorage.removeItem(STORAGE_KEYS.USER);
+    localStorage.removeItem(STORAGE_KEYS.CONVERSATIONS);
+    localStorage.removeItem(STORAGE_KEYS.MESSAGES);
+    localStorage.removeItem(STORAGE_KEYS.TRANSACTIONS);
+    localStorage.removeItem(STORAGE_KEYS.OFFERS);
+    localStorage.removeItem(STORAGE_KEYS.NOTIFICATIONS);
+    localStorage.removeItem(STORAGE_KEYS.COMPARE);
+    // Keep listings and reviews (they're public data)
     window.location.href = '/#/';
   };
 
