@@ -1316,8 +1316,11 @@ export const StoreProvider = ({ children }: { children?: ReactNode }) => {
       createdAt: new Date().toISOString()
     };
 
-    // Optimistic update
-    setNotifications(prev => [newNotification, ...prev]);
+    // Only add to local state if this notification is for the current user
+    // Otherwise, the recipient will fetch it from Supabase when they log in
+    if (notif.userId === currentUser?.id) {
+      setNotifications(prev => [newNotification, ...prev]);
+    }
 
     // Sync to Supabase
     if (supabase) {
