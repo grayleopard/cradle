@@ -41,6 +41,16 @@ const Profile = () => {
     o => o.sellerId === currentUser.id && o.status === OfferStatus.PENDING
   );
 
+  // Calculate pending earnings (payments captured but not yet paid out to seller)
+  const pendingEarnings = transactions
+    .filter(t =>
+      t.sellerId === currentUser.id &&
+      (t.status === TransactionStatus.PAYMENT_HELD ||
+       t.status === TransactionStatus.COMPLETED) &&
+      !currentUser.stripeOnboarded
+    )
+    .reduce((acc, t) => acc + (t.amount - t.platformFee), 0);
+
   // Helper to get status display
   const getStatusBadge = (status: TransactionStatus) => {
     switch (status) {
@@ -96,7 +106,7 @@ const Profile = () => {
                <img src={currentUser.avatarUrl} alt="Profile" className="w-20 h-20 rounded-full object-cover shadow-md bg-[#E8DDD4] border-2 border-white" />
             </div>
             {currentUser.isVerifiedParent && (
-              <div className="absolute -bottom-1 -right-1 bg-brand-500 p-1.5 rounded-full border-2 border-white">
+              <div className="absolute -bottom-1 -right-1 bg-[#2D9B8C] p-1.5 rounded-full border-2 border-white">
                 <UserCheck className="w-3 h-3 text-white" />
               </div>
             )}
@@ -241,9 +251,9 @@ const Profile = () => {
                     </div>
                  </div>
 
-                 {/* Stripe Connect Onboarding */}
+                 {/* Stripe Connect Status / Onboarding (only shows if needed) */}
                  <div className="mt-4">
-                    <StripeOnboarding />
+                    <StripeOnboarding pendingEarnings={pendingEarnings} />
                  </div>
               </div>
            </div>
@@ -322,9 +332,17 @@ const Profile = () => {
                   </div>
                </div>
              )) : (
-               <div className="text-center py-8 rounded-card border border-dashed bg-bg-card border-gray-300">
-                 <p className="text-[#9A8578] text-sm mb-3">No active listings</p>
-                 <Link to="/sell" className="text-brand-600 font-medium text-sm">List your first item</Link>
+               <div className="text-center py-12 rounded-2xl border border-dashed border-[#E8DDD4] bg-[#FFFCF9]">
+                 <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-[#F5EDE6] flex items-center justify-center">
+                   <Package className="w-8 h-8 text-[#B8A395]" />
+                 </div>
+                 <h3 className="font-serif text-lg font-semibold text-[#4A3F37] mb-1">No listings yet</h3>
+                 <p className="text-[#9A8578] text-sm mb-4 max-w-xs mx-auto">
+                   Turn your baby gear into cash! List items your little one has outgrown.
+                 </p>
+                 <Link to="/sell" className="inline-flex items-center gap-2 bg-[#2D9B8C] text-white font-semibold px-5 py-2.5 rounded-full hover:bg-[#247A6F] transition-colors">
+                   <Package className="w-4 h-4" /> List Your First Item
+                 </Link>
                </div>
              )}
           </div>
@@ -337,7 +355,18 @@ const Profile = () => {
                   {savedListings.map(listing => <ListingCard key={listing.id} listing={listing} />)}
                 </div>
               ) : (
-                <div className="text-center py-10 text-[#B8A395]"><Heart className="w-12 h-12 mx-auto mb-3 opacity-20" /><p>No saved items yet.</p><Link to="/" className="text-brand-600 font-medium text-sm mt-2 block">Browse items</Link></div>
+                <div className="text-center py-12 rounded-2xl border border-dashed border-[#E8DDD4] bg-[#FFFCF9]">
+                  <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-[#F5EDE6] flex items-center justify-center">
+                    <Heart className="w-8 h-8 text-[#B8A395]" />
+                  </div>
+                  <h3 className="font-serif text-lg font-semibold text-[#4A3F37] mb-1">No saved items</h3>
+                  <p className="text-[#9A8578] text-sm mb-4 max-w-xs mx-auto">
+                    Tap the heart on any listing to save it here for later.
+                  </p>
+                  <Link to="/" className="inline-flex items-center gap-2 bg-[#2D9B8C] text-white font-semibold px-5 py-2.5 rounded-full hover:bg-[#247A6F] transition-colors">
+                    <Search className="w-4 h-4" /> Browse Items
+                  </Link>
+                </div>
               )}
            </div>
         )}
@@ -371,10 +400,17 @@ const Profile = () => {
                 </Link>
               );
             }) : (
-              <div className="text-center py-10">
-                <ShoppingBag className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-                <p className="text-[#B8A395] mb-2">No purchases yet</p>
-                <Link to="/" className="text-[#2D9B8C] font-medium text-sm">Start shopping</Link>
+              <div className="text-center py-12 rounded-2xl border border-dashed border-[#E8DDD4] bg-[#FFFCF9]">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-[#F5EDE6] flex items-center justify-center">
+                  <ShoppingBag className="w-8 h-8 text-[#B8A395]" />
+                </div>
+                <h3 className="font-serif text-lg font-semibold text-[#4A3F37] mb-1">No orders yet</h3>
+                <p className="text-[#9A8578] text-sm mb-4 max-w-xs mx-auto">
+                  When you buy something, your orders will appear here.
+                </p>
+                <Link to="/" className="inline-flex items-center gap-2 bg-[#2D9B8C] text-white font-semibold px-5 py-2.5 rounded-full hover:bg-[#247A6F] transition-colors">
+                  <Search className="w-4 h-4" /> Start Shopping
+                </Link>
               </div>
             )}
           </div>
@@ -435,12 +471,17 @@ const Profile = () => {
                 </div>
               );
             }) : (
-              <div className="text-center py-10">
-                <Bell className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-                <p className="text-[#B8A395] mb-2">No saved searches</p>
-                <p className="text-xs text-[#B8A395] max-w-xs mx-auto">
+              <div className="text-center py-12 rounded-2xl border border-dashed border-[#E8DDD4] bg-[#FFFCF9]">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-[#F5EDE6] flex items-center justify-center">
+                  <Bell className="w-8 h-8 text-[#B8A395]" />
+                </div>
+                <h3 className="font-serif text-lg font-semibold text-[#4A3F37] mb-1">No saved searches</h3>
+                <p className="text-[#9A8578] text-sm mb-4 max-w-xs mx-auto">
                   Save a search from the home page to get notified when new items match your criteria.
                 </p>
+                <Link to="/" className="inline-flex items-center gap-2 bg-[#2D9B8C] text-white font-semibold px-5 py-2.5 rounded-full hover:bg-[#247A6F] transition-colors">
+                  <Search className="w-4 h-4" /> Search Items
+                </Link>
               </div>
             )}
           </div>

@@ -20,7 +20,7 @@ const Premium = () => {
   return (
     <div className="min-h-full bg-gray-900 text-white flex flex-col relative overflow-hidden">
       {/* Background decoration */}
-      <div className="absolute top-0 right-0 w-64 h-64 bg-brand-500 rounded-full blur-[100px] opacity-20 -mr-20 -mt-20"></div>
+      <div className="absolute top-0 right-0 w-64 h-64 bg-[#2D9B8C] rounded-full blur-[100px] opacity-20 -mr-20 -mt-20"></div>
       <div className="absolute bottom-0 left-0 w-64 h-64 bg-purple-500 rounded-full blur-[100px] opacity-20 -ml-20 -mb-20"></div>
 
       <div className="p-4 flex items-center gap-3 relative z-10">
@@ -31,7 +31,7 @@ const Premium = () => {
       </div>
 
       <div className="flex-1 p-8 flex flex-col items-center relative z-10">
-        <div className="w-24 h-24 bg-gradient-to-tr from-brand-400 to-purple-500 rounded-3xl flex items-center justify-center mb-8 shadow-2xl shadow-brand-900/50 rotate-3">
+        <div className="w-24 h-24 bg-gradient-to-tr from-[#40BBA9] to-purple-500 rounded-3xl flex items-center justify-center mb-8 shadow-2xl shadow-[#247A6F]/50 rotate-3">
           <Crown className="w-12 h-12 text-white" />
         </div>
 
@@ -42,8 +42,8 @@ const Premium = () => {
 
         <div className="w-full space-y-4 mb-10">
            <div className="bg-white/10 backdrop-blur-lg p-4 rounded-xl flex items-center gap-4 border border-white/5">
-              <div className="bg-brand-500/20 p-2 rounded-lg">
-                <Rocket className="w-6 h-6 text-brand-400" />
+              <div className="bg-[#2D9B8C]/20 p-2 rounded-lg">
+                <Rocket className="w-6 h-6 text-[#40BBA9]" />
               </div>
               <div>
                 <h3 className="font-bold text-sm">Priority Listings</h3>

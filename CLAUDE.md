@@ -4,6 +4,34 @@
 
 Pipit is a marketplace app for parents to buy and sell pre-loved baby/kids gear. Built with React, TypeScript, Vite, and Tailwind CSS. Uses Supabase for backend and Stripe for payments.
 
+## 🎨 Design Bible (CRITICAL)
+
+**The landing page is the gold standard.** Every screen must feel as polished, warm, and friendly.
+
+### Reference Files
+- `.claude/specs/pipit-landing-page.html` — The visual standard
+- `.claude/specs/pipit-design-reference.md` — Extracted patterns
+
+### Quick Design Rules
+| Element | Standard |
+|---------|----------|
+| **Headlines** | Fraunces (serif) |
+| **Body text** | DM Sans |
+| **Background** | `#FFFCF9` (warm cream, NOT white) |
+| **Primary** | `#2D9B8C` (warm teal) |
+| **Cards** | White surface floating on warm bg |
+| **Shadows** | `rgba(30,25,20,...)` (warm, NOT black) |
+| **Border radius** | 20px cards, 100px pills |
+| **Emojis** | Use for personality (🐦🛡️🔒💛✨) |
+
+### Before Marking Any Screen Done
+- [ ] Uses Fraunces for headlines, DM Sans for body
+- [ ] Background is warm cream, not white
+- [ ] Has at least one emoji for personality
+- [ ] Shadows are warm-tinted
+- [ ] Spacing is generous (nothing cramped)
+- [ ] Feels as polished as the landing page
+
 ## Tech Stack
 
 - **Frontend**: React 18 + TypeScript + Vite

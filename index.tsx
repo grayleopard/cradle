@@ -36,7 +36,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
           padding: '24px',
           fontFamily: 'system-ui, -apple-system, sans-serif',
           textAlign: 'center',
-          backgroundColor: '#F9F6F0',
+          backgroundColor: '#FFFCF9',
           minHeight: '100vh',
           display: 'flex',
           flexDirection: 'column',
@@ -62,11 +62,11 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
           </div>
 
           <h1 style={{
-            color: '#2F3E2E',
+            color: '#4A3F37',
             marginBottom: '8px',
             fontSize: '24px',
             fontWeight: '700',
-            fontFamily: 'Georgia, serif'
+            fontFamily: 'Fraunces, Georgia, serif'
           }}>
             Oops! Something went wrong
           </h1>
@@ -87,8 +87,8 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
               style={{
                 padding: '12px 24px',
                 backgroundColor: 'white',
-                color: '#2F3E2E',
-                border: '1px solid #E3D5CA',
+                color: '#4A3F37',
+                border: '1px solid #E8DDD4',
                 borderRadius: '12px',
                 cursor: 'pointer',
                 fontWeight: '600',
@@ -101,7 +101,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
               onClick={() => window.location.reload()}
               style={{
                 padding: '12px 24px',
-                backgroundColor: '#C68E68',
+                backgroundColor: '#2D9B8C',
                 color: 'white',
                 border: 'none',
                 borderRadius: '12px',

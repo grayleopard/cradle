@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../context/StoreContext';
 import { User } from '../types';
-import { X, Smartphone, MessageSquare, Gift, AlertCircle, RefreshCw } from 'lucide-react';
-import { sendOtp, verifyOtp, isMockAuthMode, getUserProfile } from '../services/supabase';
+import { X, Smartphone, MessageSquare, Gift, AlertCircle, RefreshCw, Mail, Lock, Eye, EyeOff } from 'lucide-react';
+import { sendOtp, verifyOtp, isMockAuthMode, getUserProfile, signInWithEmail, signUpWithEmail, isEmailAuthAvailable } from '../services/supabase';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -13,9 +13,14 @@ interface AuthModalProps {
 const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => {
   const { login } = useStore();
 
-  const [step, setStep] = useState<'phone' | 'otp' | 'profile'>('phone');
+  const [authMethod, setAuthMethod] = useState<'phone' | 'email'>('phone');
+  const [step, setStep] = useState<'phone' | 'otp' | 'email' | 'profile'>('phone');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [otp, setOtp] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [isSignUp, setIsSignUp] = useState(false);
   const [profile, setProfile] = useState({ name: '', zip: '', referralCode: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -178,11 +183,78 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => 
     onClose();
   };
 
+  // Handle email auth submit
+  const handleEmailSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email || !password) return;
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      let result;
+      if (isSignUp) {
+        result = await signUpWithEmail(email, password);
+      } else {
+        result = await signInWithEmail(email, password);
+      }
+
+      setAuthUserId(result.userId);
+
+      if (result.isNewUser) {
+        setStep('profile');
+      } else {
+        const existingProfile = await getUserProfile(result.userId);
+        if (existingProfile) {
+          const user: User = {
+            id: existingProfile.id,
+            name: existingProfile.username || 'User',
+            location: existingProfile.location_zip || '',
+            isVerifiedParent: existingProfile.is_verified_parent || false,
+            isPremium: existingProfile.is_premium || false,
+            isAdmin: existingProfile.is_admin || false,
+            joinDate: existingProfile.created_at,
+            itemsSold: existingProfile.items_sold || 0,
+            avatarUrl: existingProfile.avatar_url || '',
+            bio: existingProfile.bio,
+            email: existingProfile.email,
+            savedListingIds: existingProfile.saved_listing_ids || [],
+            savedSearches: existingProfile.saved_searches || [],
+            followingIds: existingProfile.following_ids || [],
+            stripeAccountId: existingProfile.stripe_account_id,
+            stripeOnboarded: existingProfile.stripe_onboarded || false,
+            referralCode: existingProfile.referral_code,
+            referredBy: existingProfile.referred_by,
+            referralCredit: existingProfile.referral_credit || 0,
+            referralCount: existingProfile.referral_count || 0,
+            neighborhood: existingProfile.neighborhood,
+            kidAges: existingProfile.kid_ages || [],
+            parentingTags: existingProfile.parenting_tags || []
+          };
+          login(user);
+          onSuccess?.();
+          onClose();
+        } else {
+          setStep('profile');
+        }
+      }
+    } catch (err: any) {
+      setError(err.message || 'Authentication failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleClose = () => {
     // Reset state when closing
+    setAuthMethod('phone');
     setStep('phone');
     setPhoneNumber('');
     setOtp('');
+    setEmail('');
+    setPassword('');
+    setShowPassword(false);
+    setIsSignUp(false);
     setProfile({ name: '', zip: '', referralCode: '' });
     setShowFakeNotification(false);
     setError(null);
@@ -233,8 +305,8 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => 
 
         {step === 'phone' && (
           <form onSubmit={handlePhoneSubmit} className="animate-in fade-in duration-300">
-            <h2 className="text-2xl font-bold mb-2 font-serif text-[#4A3F37]">Sign in to continue</h2>
-            <p className="text-[#6B5D52] mb-8 text-sm">We'll text you a code to verify your account.</p>
+            <h2 className="text-2xl font-bold mb-2 font-serif text-[#4A3F37]">👋 Welcome to pipit</h2>
+            <p className="text-[#6B5D52] mb-6 text-sm">We'll text you a code to verify your account.</p>
 
             {error && (
               <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl flex items-center gap-2 text-red-700 text-sm">
@@ -257,10 +329,99 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => 
 
             <button
               disabled={loading || phoneNumber.replace(/\D/g, '').length < 10}
-              className="w-full py-4 rounded-xl font-bold text-lg disabled:opacity-50 bg-[#4A3F37] text-white hover:bg-[#2D2622] transition-colors"
+              className="w-full py-4 rounded-full font-bold text-lg disabled:opacity-50 bg-[#2D9B8C] text-white hover:bg-[#247A6F] transition-colors shadow-warm-md"
             >
               {loading ? 'Sending...' : 'Send Code'}
             </button>
+
+            {isEmailAuthAvailable() && (
+              <div className="mt-6 pt-4 border-t border-[#E8DDD4]">
+                <button
+                  type="button"
+                  onClick={() => { setStep('email'); setError(null); }}
+                  className="w-full flex items-center justify-center gap-2 py-3 text-sm text-[#6B5D52] hover:text-[#4A3F37] transition-colors"
+                >
+                  <Mail className="w-4 h-4" />
+                  Continue with email instead
+                </button>
+              </div>
+            )}
+          </form>
+        )}
+
+        {step === 'email' && (
+          <form onSubmit={handleEmailSubmit} className="animate-in fade-in duration-300">
+            <h2 className="text-2xl font-bold mb-2 font-serif text-[#4A3F37]">
+              {isSignUp ? '🎉 Create Account' : '👋 Welcome Back'}
+            </h2>
+            <p className="text-[#6B5D52] mb-6 text-sm">
+              {isSignUp ? 'Sign up with your email and password.' : 'Sign in to your account.'}
+            </p>
+
+            {error && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl flex items-center gap-2 text-red-700 text-sm">
+                <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                {error}
+              </div>
+            )}
+
+            <div className="space-y-4 mb-6">
+              <div className="relative">
+                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[#2D9B8C]" />
+                <input
+                  autoFocus
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@email.com"
+                  className="w-full pl-12 pr-4 py-4 rounded-xl text-lg outline-none transition-all bg-white border border-[#E8DDD4] text-[#4A3F37] focus:ring-1 focus:ring-[#2D9B8C]"
+                />
+              </div>
+
+              <div className="relative">
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[#2D9B8C]" />
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Password"
+                  className="w-full pl-12 pr-12 py-4 rounded-xl text-lg outline-none transition-all bg-white border border-[#E8DDD4] text-[#4A3F37] focus:ring-1 focus:ring-[#2D9B8C]"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-[#B8A395] hover:text-[#6B5D52]"
+                >
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
+            </div>
+
+            <button
+              disabled={loading || !email || !password}
+              className="w-full py-4 rounded-full font-bold text-lg disabled:opacity-50 bg-[#2D9B8C] text-white hover:bg-[#247A6F] transition-colors shadow-warm-md"
+            >
+              {loading ? 'Please wait...' : (isSignUp ? 'Create Account' : 'Sign In')}
+            </button>
+
+            <div className="mt-4 flex flex-col gap-3 text-center text-sm">
+              <button
+                type="button"
+                onClick={() => setIsSignUp(!isSignUp)}
+                className="text-[#2D9B8C] hover:text-[#247A6F]"
+              >
+                {isSignUp ? 'Already have an account? Sign in' : "Don't have an account? Sign up"}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => { setStep('phone'); setError(null); }}
+                className="flex items-center justify-center gap-2 text-[#B8A395] hover:text-[#6B5D52] transition-colors"
+              >
+                <Smartphone className="w-4 h-4" />
+                Use phone number instead
+              </button>
+            </div>
           </form>
         )}
 
@@ -288,7 +449,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => 
 
             <button
               disabled={loading || otp.length < 6}
-              className="w-full py-4 rounded-xl font-bold text-lg disabled:opacity-50 bg-[#4A3F37] text-white hover:bg-[#2D2622] transition-colors"
+              className="w-full py-4 rounded-full font-bold text-lg disabled:opacity-50 bg-[#2D9B8C] text-white hover:bg-[#247A6F] transition-colors shadow-warm-md"
             >
               {loading ? 'Verifying...' : 'Verify'}
             </button>
@@ -318,7 +479,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => 
         {step === 'profile' && (
           <form onSubmit={handleProfileSubmit} className="animate-in fade-in duration-300">
             <div className="text-center mb-8">
-              <h2 className="text-2xl font-bold mb-2 font-serif text-[#4A3F37]">Create Profile</h2>
+              <h2 className="text-2xl font-bold mb-2 font-serif text-[#4A3F37]">🎉 Almost there!</h2>
               <p className="text-[#6B5D52] text-sm">Introduce yourself to other parents.</p>
             </div>
 
@@ -368,9 +529,9 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => 
             </div>
 
             <button
-              className="w-full py-4 rounded-xl font-bold text-lg shadow-warm-lg bg-[#2D9B8C] text-white hover:bg-[#247A6F] transition-colors"
+              className="w-full py-4 rounded-full font-bold text-lg shadow-warm-lg bg-[#2D9B8C] text-white hover:bg-[#247A6F] transition-colors"
             >
-              Finish Setup
+              Get Started
             </button>
           </form>
         )}

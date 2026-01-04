@@ -13,14 +13,14 @@ const DevSettings = () => {
   // Admin-only access
   if (!currentUser?.isAdmin) {
     return (
-      <div className="min-h-full bg-[#F9F6F0] flex items-center justify-center p-6">
+      <div className="min-h-full bg-[#FFFCF9] flex items-center justify-center p-6">
         <div className="text-center">
           <ShieldAlert className="w-12 h-12 text-red-400 mx-auto mb-4" />
-          <h2 className="text-xl font-bold text-[#2F3E2E] mb-2">Access Denied</h2>
-          <p className="text-[#5C5C5C] mb-4">This page is only available to administrators.</p>
+          <h2 className="text-xl font-bold text-[#4A3F37] mb-2">Access Denied</h2>
+          <p className="text-[#6B5D52] mb-4">This page is only available to administrators.</p>
           <button
             onClick={() => navigate('/profile')}
-            className="px-6 py-2 bg-[#2F3E2E] text-white rounded-xl font-medium"
+            className="px-6 py-2 bg-[#4A3F37] text-white rounded-xl font-medium"
           >
             Go Back
           </button>
@@ -93,7 +93,7 @@ const DevSettings = () => {
         <form onSubmit={handleSave} className="space-y-6">
           
           <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
-             <div className="flex items-center gap-2 mb-4 text-brand-600 font-bold border-b border-gray-100 pb-2">
+             <div className="flex items-center gap-2 mb-4 text-[#2D9B8C] font-bold border-b border-gray-100 pb-2">
                 <Database className="w-4 h-4" /> Supabase Config
              </div>
              <div className="space-y-4">
@@ -104,7 +104,7 @@ const DevSettings = () => {
                      value={keys.VITE_SUPABASE_URL}
                      onChange={handleChange}
                      placeholder="https://xyz.supabase.co"
-                     className="w-full p-3 bg-gray-50 rounded-lg text-sm font-mono border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                     className="w-full p-3 bg-gray-50 rounded-lg text-sm font-mono border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#2D9B8C]"
                    />
                 </div>
                 <div>
@@ -115,7 +115,7 @@ const DevSettings = () => {
                      onChange={handleChange}
                      type="password"
                      placeholder="eyJhbGciOiJIUz..."
-                     className="w-full p-3 bg-gray-50 rounded-lg text-sm font-mono border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                     className="w-full p-3 bg-gray-50 rounded-lg text-sm font-mono border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#2D9B8C]"
                    />
                 </div>
              </div>
@@ -133,7 +133,7 @@ const DevSettings = () => {
                      value={keys.VITE_CLOUDINARY_CLOUD_NAME}
                      onChange={handleChange}
                      placeholder="e.g. demo"
-                     className="w-full p-3 bg-gray-50 rounded-lg text-sm font-mono border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                     className="w-full p-3 bg-gray-50 rounded-lg text-sm font-mono border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#2D9B8C]"
                    />
                 </div>
                 <div>
@@ -143,7 +143,7 @@ const DevSettings = () => {
                      value={keys.VITE_CLOUDINARY_UPLOAD_PRESET}
                      onChange={handleChange}
                      placeholder="e.g. cradle_uploads"
-                     className="w-full p-3 bg-gray-50 rounded-lg text-sm font-mono border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                     className="w-full p-3 bg-gray-50 rounded-lg text-sm font-mono border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#2D9B8C]"
                    />
                 </div>
              </div>

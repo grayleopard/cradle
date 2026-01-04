@@ -344,7 +344,7 @@ const CreateListing = () => {
                 <div key={img.id} className="aspect-square bg-gray-100 rounded-xl relative overflow-hidden group border border-gray-200">
                   {img.status === 'uploading' ? (
                     <div className="absolute inset-0 flex items-center justify-center bg-gray-50">
-                      <Loader2 className="w-6 h-6 animate-spin text-brand-500" />
+                      <Loader2 className="w-6 h-6 animate-spin text-[#2D9B8C]" />
                     </div>
                   ) : (
                     <img src={img.previewUrl} alt={`Preview ${idx}`} className="w-full h-full object-cover" />
@@ -385,33 +385,72 @@ const CreateListing = () => {
 
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
-              <input required type="text" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} placeholder="e.g. UPPAbaby Vista V2" className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-500 transition-all" />
+              <div className="flex justify-between items-center mb-1">
+                <label className="block text-sm font-medium text-gray-700">Title <span className="text-red-400">*</span></label>
+                <span className={`text-xs ${formData.title.length > 60 ? 'text-red-500' : formData.title.length > 40 ? 'text-amber-500' : 'text-gray-400'}`}>
+                  {formData.title.length}/60
+                </span>
+              </div>
+              <input
+                required
+                type="text"
+                maxLength={60}
+                value={formData.title}
+                onChange={e => setFormData({...formData, title: e.target.value})}
+                placeholder="e.g. UPPAbaby Vista V2"
+                className={`w-full p-3 bg-gray-50 rounded-xl border focus:outline-none focus:ring-2 focus:ring-[#2D9B8C] transition-all ${
+                  formData.title.length > 0 && formData.title.length < 5
+                    ? 'border-amber-300 bg-amber-50/50'
+                    : 'border-gray-200'
+                }`}
+              />
+              {formData.title.length > 0 && formData.title.length < 5 && (
+                <p className="text-xs text-amber-600 mt-1">Title should be at least 5 characters</p>
+              )}
             </div>
             <div>
               <div className="flex justify-between items-center mb-1">
-                 <label className="block text-sm font-medium text-gray-700">Description</label>
-                 <button 
-                   type="button" 
-                   onClick={handleOptimizeDescription}
-                   disabled={optimizingDesc}
-                   className="text-xs text-purple-600 font-bold flex items-center gap-1 hover:bg-purple-50 px-2 py-1 rounded transition-colors"
-                 >
-                   {optimizingDesc ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wand2 className="w-3 h-3" />} 
-                   {optimizingDesc ? "Polishing..." : "Polish"}
-                 </button>
+                 <label className="block text-sm font-medium text-gray-700">Description <span className="text-red-400">*</span></label>
+                 <div className="flex items-center gap-3">
+                   <span className={`text-xs ${formData.description.length > 500 ? 'text-red-500' : formData.description.length > 400 ? 'text-amber-500' : 'text-gray-400'}`}>
+                     {formData.description.length}/500
+                   </span>
+                   <button
+                     type="button"
+                     onClick={handleOptimizeDescription}
+                     disabled={optimizingDesc}
+                     className="text-xs text-purple-600 font-bold flex items-center gap-1 hover:bg-purple-50 px-2 py-1 rounded transition-colors"
+                   >
+                     {optimizingDesc ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wand2 className="w-3 h-3" />}
+                     {optimizingDesc ? "Polishing..." : "Polish"}
+                   </button>
+                 </div>
               </div>
-              <textarea required value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} placeholder="Include condition, age, and any defects..." className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-500 h-32 transition-all" />
+              <textarea
+                required
+                maxLength={500}
+                value={formData.description}
+                onChange={e => setFormData({...formData, description: e.target.value})}
+                placeholder="Include condition, age, and any defects..."
+                className={`w-full p-3 bg-gray-50 rounded-xl border focus:outline-none focus:ring-2 focus:ring-[#2D9B8C] h-32 transition-all resize-none ${
+                  formData.description.length > 0 && formData.description.length < 20
+                    ? 'border-amber-300 bg-amber-50/50'
+                    : 'border-gray-200'
+                }`}
+              />
+              {formData.description.length > 0 && formData.description.length < 20 && (
+                <p className="text-xs text-amber-600 mt-1">Add more detail to help buyers (at least 20 characters)</p>
+              )}
             </div>
           </div>
 
-          <div className="bg-brand-50 rounded-xl p-4 border border-brand-100">
-             <h3 className="text-sm font-semibold text-brand-800 mb-2">Safety Verification Required</h3>
-             <p className="text-xs text-brand-600 mb-4">We use a smart check to analyze your photos against the CPSC recall database.</p>
+          <div className="bg-[#F0FAF8] rounded-xl p-4 border border-[#2D9B8C]/20">
+             <h3 className="text-sm font-semibold text-[#4A3F37] mb-2">Safety Verification Required</h3>
+             <p className="text-xs text-[#2D9B8C] mb-4">We use a smart check to analyze your photos against the CPSC recall database.</p>
              {safetyResult.status === 'idle' && (
-               <button onClick={handleSafetyCheck} disabled={!formData.title || !formData.description || images.length === 0} className="w-full py-3 bg-brand-600 text-white rounded-xl font-medium disabled:opacity-50 flex items-center justify-center gap-2">Verify Safety</button>
+               <button onClick={handleSafetyCheck} disabled={!formData.title || !formData.description || images.length === 0} className="w-full py-3 bg-[#2D9B8C] text-white rounded-xl font-medium disabled:opacity-50 flex items-center justify-center gap-2">Verify Safety</button>
              )}
-             {safetyResult.status === 'checking' && <div className="w-full py-3 bg-brand-100 text-brand-700 rounded-xl font-medium flex items-center justify-center gap-2"><Loader2 className="w-5 h-5 animate-spin" /> Analyzing Item...</div>}
+             {safetyResult.status === 'checking' && <div className="w-full py-3 bg-[#F0FAF8] text-[#247A6F] rounded-xl font-medium flex items-center justify-center gap-2"><Loader2 className="w-5 h-5 animate-spin" /> Analyzing Item...</div>}
              {safetyResult.status === 'safe' && <button type="button" onClick={() => setStep(2)} className="w-full py-3 bg-green-100 text-green-700 rounded-xl font-medium flex items-center justify-center gap-2 hover:bg-green-200"><CheckCircle2 className="w-5 h-5" /> Verified Safe - Continue</button>}
              {safetyResult.status === 'warning' && (
                 <div className="space-y-3">
@@ -428,18 +467,29 @@ const CreateListing = () => {
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Price ($)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Price ($) <span className="text-red-400">*</span></label>
               <div className="relative">
-                <input 
-                  required 
-                  type="number" 
-                  value={formData.price} 
-                  onChange={e => setFormData({...formData, price: e.target.value})} 
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">$</span>
+                <input
+                  required
+                  type="number"
+                  min="1"
+                  max="10000"
+                  value={formData.price}
+                  onChange={e => setFormData({...formData, price: e.target.value})}
                   onBlur={handlePriceBlur}
-                  className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-500 transition-all" 
+                  placeholder="0"
+                  className={`w-full pl-7 pr-3 py-3 bg-gray-50 rounded-xl border focus:outline-none focus:ring-2 focus:ring-[#2D9B8C] transition-all ${
+                    formData.price && (Number(formData.price) < 1 || Number(formData.price) > 10000)
+                      ? 'border-red-300 bg-red-50/50'
+                      : 'border-gray-200'
+                  }`}
                 />
                 {checkingPrice && <div className="absolute right-3 top-3.5"><Loader2 className="w-4 h-4 animate-spin text-gray-400" /></div>}
               </div>
+              {formData.price && Number(formData.price) < 1 && (
+                <p className="text-xs text-red-500 mt-1">Price must be at least $1</p>
+              )}
               
               {/* Full Deal Analysis Badge */}
               {!checkingPrice && formData.dealAnalysis && (
@@ -456,14 +506,45 @@ const CreateListing = () => {
               )}
             </div>
             <div>
-               <label className="block text-sm font-medium text-gray-700 mb-1">Original Price ($)</label>
-               <input type="number" value={formData.originalPrice} onChange={e => setFormData({...formData, originalPrice: e.target.value})} placeholder="Optional" className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-500" />
+               <label className="block text-sm font-medium text-gray-700 mb-1">
+                 Original Price <span className="text-gray-400 font-normal">(optional)</span>
+               </label>
+               <div className="relative">
+                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">$</span>
+                 <input
+                   type="number"
+                   min="0"
+                   value={formData.originalPrice}
+                   onChange={e => setFormData({...formData, originalPrice: e.target.value})}
+                   placeholder="Retail price"
+                   className="w-full pl-7 pr-3 py-3 bg-gray-50 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#2D9B8C]"
+                 />
+               </div>
+               {formData.originalPrice && formData.price && Number(formData.originalPrice) <= Number(formData.price) && (
+                 <p className="text-xs text-amber-600 mt-1">Should be higher than your price</p>
+               )}
             </div>
           </div>
 
+          {/* Seller Fee Disclosure */}
+          {formData.price && Number(formData.price) > 0 && (
+            <div className="bg-[#F0FAF8] border border-[#2D9B8C]/20 rounded-xl p-3 text-sm">
+              <div className="flex items-start gap-2">
+                <DollarSign className="w-4 h-4 text-[#2D9B8C] mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="text-[#4A3F37] font-medium">When your item sells for ${formData.price}:</p>
+                  <p className="text-[#6B5D52] text-xs mt-1">
+                    You'll receive ~${(Number(formData.price) - (Number(formData.price) * 1.055 * 0.029 + 0.30)).toFixed(2)} after payment processing (~3%).
+                    <span className="block mt-0.5 text-[#2D9B8C]">Pipit's fee is paid by the buyer, not you.</span>
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div>
              <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
-             <select value={formData.category} onChange={e => setFormData({...formData, category: e.target.value as Category})} className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-500">
+             <select value={formData.category} onChange={e => setFormData({...formData, category: e.target.value as Category})} className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#2D9B8C]">
                {Object.values(Category).map(c => <option key={c} value={c}>{c}</option>)}
              </select>
           </div>
@@ -488,13 +569,13 @@ const CreateListing = () => {
           <div className="grid grid-cols-2 gap-4">
              <div>
                <label className="block text-sm font-medium text-gray-700 mb-1">Condition</label>
-               <select value={formData.condition} onChange={e => setFormData({...formData, condition: e.target.value as Condition})} className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-500">
+               <select value={formData.condition} onChange={e => setFormData({...formData, condition: e.target.value as Condition})} className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#2D9B8C]">
                  {Object.values(Condition).map(c => <option key={c} value={c}>{c}</option>)}
                </select>
              </div>
              <div>
                <label className="block text-sm font-medium text-gray-700 mb-1">Age Range</label>
-               <select value={formData.ageRange} onChange={e => setFormData({...formData, ageRange: e.target.value as AgeRange})} className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-500">
+               <select value={formData.ageRange} onChange={e => setFormData({...formData, ageRange: e.target.value as AgeRange})} className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#2D9B8C]">
                  {Object.values(AgeRange).map(c => <option key={c} value={c}>{c}</option>)}
                </select>
              </div>
@@ -503,16 +584,16 @@ const CreateListing = () => {
           <div className="space-y-3 bg-gray-50 p-4 rounded-xl border border-gray-100">
             <h4 className="font-medium text-gray-700 text-sm">Household Details</h4>
             <label className="flex items-center gap-3 cursor-pointer">
-              <input type="checkbox" checked={formData.isSmokeFree} onChange={e => setFormData({...formData, isSmokeFree: e.target.checked})} className="w-5 h-5 text-brand-600 rounded" />
+              <input type="checkbox" checked={formData.isSmokeFree} onChange={e => setFormData({...formData, isSmokeFree: e.target.checked})} className="w-5 h-5 text-[#2D9B8C] rounded" />
               <span className="text-sm text-gray-700">Smoke-free home</span>
             </label>
             <label className="flex items-center gap-3 cursor-pointer">
-              <input type="checkbox" checked={formData.isPetFree} onChange={e => setFormData({...formData, isPetFree: e.target.checked})} className="w-5 h-5 text-brand-600 rounded" />
+              <input type="checkbox" checked={formData.isPetFree} onChange={e => setFormData({...formData, isPetFree: e.target.checked})} className="w-5 h-5 text-[#2D9B8C] rounded" />
               <span className="text-sm text-gray-700">Pet-free home</span>
             </label>
           </div>
 
-          <button type="submit" className="w-full py-4 bg-brand-600 text-white text-lg font-semibold rounded-xl hover:bg-brand-700 shadow-lg transition-all transform hover:-translate-y-0.5">
+          <button type="submit" className="w-full py-4 bg-[#2D9B8C] text-white text-lg font-semibold rounded-xl hover:bg-[#247A6F] shadow-lg transition-all transform hover:-translate-y-0.5">
              {id ? 'Update Listing' : 'Publish Listing'}
            </button>
         </form>

@@ -64,7 +64,7 @@ const ListingDetail = () => {
 
   const listing = getListingById(id || '');
 
-  // Initialize with stored analysis if present
+  // Initialize state when listing changes
   useEffect(() => {
     setCurrentImageIndex(0);
     if (listing?.dealAnalysis) {
@@ -74,7 +74,27 @@ const ListingDetail = () => {
     }
   }, [id, listing?.dealAnalysis]);
 
-  if (!listing) return <div className="p-4">Listing not found</div>;
+  if (!listing) {
+    return (
+      <div className="min-h-screen bg-[#FFFCF9] flex items-center justify-center p-6">
+        <div className="text-center max-w-sm">
+          <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-[#F5EDE6] flex items-center justify-center">
+            <ShoppingBag className="w-10 h-10 text-[#B8A395]" />
+          </div>
+          <h1 className="font-serif text-2xl font-bold text-[#4A3F37] mb-2">Listing not found</h1>
+          <p className="text-[#9A8578] mb-6">
+            This item may have been sold or removed by the seller.
+          </p>
+          <button
+            onClick={() => navigate('/')}
+            className="inline-flex items-center gap-2 bg-[#2D9B8C] text-white font-semibold px-6 py-3 rounded-full hover:bg-[#247A6F] transition-colors"
+          >
+            <Home className="w-4 h-4" /> Browse Other Items
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const seller = getUserById(listing.userId);
   const sellerReviews = getReviewsByUserId(listing.userId);
@@ -292,100 +312,105 @@ const ListingDetail = () => {
   };
 
   return (
-    <div 
-        className={`min-h-full pb-40 relative ${isPipitV2 ? 'bg-[#FFFCF9]' : 'bg-white'}`}
+    <div
+        className={`min-h-full pb-40 ${isPipitV2 ? 'bg-[#FFFCF9]' : 'bg-white'}`}
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
     >
-      
-      {/* Top Nav Overlay */}
-      <div className="absolute top-0 left-0 right-0 p-4 flex justify-between z-[60] pointer-events-none">
-        <div className="flex gap-2 pointer-events-auto">
-          <button 
-            onClick={handleBack} 
-            className={`p-2 rounded-full shadow-sm transition-colors cursor-pointer ${isPipitV2 ? 'bg-[#FFFCF9]/80 text-[#4A3F37] hover:bg-[#FFFCF9]' : 'bg-white/80 backdrop-blur-md text-gray-800 hover:bg-white'}`}
-          >
-            <ChevronLeft className="w-5 h-5" />
-          </button>
-          {!isPipitV2 && (
-            <button 
-                onClick={handleHome} 
-                className="p-2 bg-white/80 backdrop-blur-md rounded-full shadow-sm hover:bg-white transition-colors cursor-pointer"
+      {/* Header Bar */}
+      <div className="sticky top-0 z-50 bg-[#FFFCF9] border-b border-[#E8DDD4] px-4 py-3">
+        <div className="max-w-3xl mx-auto flex justify-between items-center">
+          {/* Mobile: Back button, Desktop: Logo */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleBack}
+              className="lg:hidden p-2 rounded-full hover:bg-[#F5EDE6] transition-colors text-[#4A3F37]"
             >
-                <Home className="w-5 h-5 text-gray-800" />
+              <ChevronLeft className="w-5 h-5" />
             </button>
+            <Link
+              to="/"
+              className="hidden lg:flex items-center gap-2 hover:opacity-80 transition-opacity"
+            >
+              <span className="text-2xl">🐦</span>
+              <span className="font-serif font-bold text-xl text-[#4A3F37]">pipit</span>
+            </Link>
+          </div>
+
+          <div className="flex gap-2">
+            <button
+              onClick={handleShare}
+              className="p-2 rounded-full hover:bg-[#F5EDE6] transition-colors text-[#4A3F37]"
+            >
+              <Share2 className="w-5 h-5" />
+            </button>
+            <button
+              onClick={handleToggleFavorite}
+              className={`p-2 rounded-full hover:bg-[#F5EDE6] transition-colors ${isFavorite ? 'text-red-500' : 'text-[#4A3F37]'}`}
+            >
+              <Heart className={`w-5 h-5 ${isFavorite ? 'fill-current' : ''}`} />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content Container */}
+      <div className="max-w-3xl mx-auto px-4 lg:px-6 py-6">
+
+        {/* Image Gallery */}
+        <div className="relative rounded-2xl overflow-hidden bg-[#F5EDE6] aspect-[4/3] lg:aspect-[16/10] mb-6">
+          <ImageWithSkeleton
+            src={listing.images[currentImageIndex]}
+            alt={`${listing.title} - ${currentImageIndex + 1}`}
+            className={`w-full h-full object-cover transition-opacity duration-300 ${listing.isSold ? 'grayscale opacity-75' : ''}`}
+          />
+
+          {/* Navigation Arrows */}
+          {listing.images.length > 1 && (
+            <>
+              {currentImageIndex > 0 && (
+                <button
+                  onClick={prevImage}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 p-2 bg-white/90 text-[#4A3F37] rounded-full shadow-md hover:bg-white transition-colors"
+                >
+                  <ChevronLeft className="w-5 h-5" />
+                </button>
+              )}
+              {currentImageIndex < listing.images.length - 1 && (
+                <button
+                  onClick={nextImage}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-2 bg-white/90 text-[#4A3F37] rounded-full shadow-md hover:bg-white transition-colors"
+                >
+                  <ChevronRight className="w-5 h-5" />
+                </button>
+              )}
+
+              {/* Dots Indicator */}
+              <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-2">
+                {listing.images.map((_, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => setCurrentImageIndex(idx)}
+                    className={`w-2 h-2 rounded-full transition-all ${idx === currentImageIndex ? 'bg-white scale-125 shadow-md' : 'bg-white/60 hover:bg-white/80'}`}
+                  />
+                ))}
+              </div>
+            </>
+          )}
+
+          {/* Sold Overlay */}
+          {listing.isSold && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/30 backdrop-blur-[2px]">
+              <div className="bg-white/90 px-8 py-3 rounded-2xl transform -rotate-12 shadow-2xl border-4 border-red-500">
+                <span className="text-3xl font-black text-red-500 tracking-widest uppercase">SOLD</span>
+              </div>
+            </div>
           )}
         </div>
-        
-        <div className="flex gap-2 pointer-events-auto">
-           <button 
-             onClick={handleShare}
-             className={`p-2 rounded-full shadow-sm transition-colors cursor-pointer ${isPipitV2 ? 'bg-[#FFFCF9]/80 text-[#4A3F37] hover:bg-[#FFFCF9]' : 'bg-white/80 backdrop-blur-md text-gray-800 hover:bg-white'}`}
-           >
-            <Share2 className="w-5 h-5" />
-          </button>
-          <button 
-            onClick={handleToggleFavorite}
-            className={`p-2 rounded-full shadow-sm transition-colors cursor-pointer ${isPipitV2 ? 'bg-[#FFFCF9]/80 hover:bg-[#FFFCF9]' : 'bg-white/80 backdrop-blur-md hover:bg-white'} ${isFavorite ? 'text-red-500' : isPipitV2 ? 'text-[#4A3F37]' : 'text-gray-800'}`}
-          >
-            <Heart className={`w-5 h-5 ${isFavorite ? 'fill-current' : ''}`} />
-          </button>
-        </div>
-      </div>
 
-      {/* Image Gallery Carousel */}
-      <div className={`w-full relative group ${isPipitV2 ? 'h-[50vh] rounded-b-[2.5rem] overflow-hidden shadow-sm' : 'h-80 bg-gray-200'}`}>
-        <ImageWithSkeleton
-          src={listing.images[currentImageIndex]} 
-          alt={`${listing.title} - ${currentImageIndex + 1}`} 
-          className={`w-full h-full object-cover transition-opacity duration-300 ${listing.isSold ? 'grayscale opacity-75' : ''}`} 
-        />
-        
-        {/* Navigation Arrows */}
-        {listing.images.length > 1 && (
-          <>
-            {currentImageIndex > 0 && (
-              <button 
-                onClick={prevImage}
-                className="absolute left-4 top-1/2 -translate-y-1/2 p-1.5 bg-black/30 text-white rounded-full backdrop-blur-sm hover:bg-black/50 transition-colors z-20"
-              >
-                <ChevronLeft className="w-6 h-6" />
-              </button>
-            )}
-            {currentImageIndex < listing.images.length - 1 && (
-              <button 
-                onClick={nextImage}
-                className="absolute right-4 top-1/2 -translate-y-1/2 p-1.5 bg-black/30 text-white rounded-full backdrop-blur-sm hover:bg-black/50 transition-colors z-20"
-              >
-                <ChevronRight className="w-6 h-6" />
-              </button>
-            )}
-            
-            {/* Dots Indicator */}
-            <div className="absolute bottom-6 left-0 right-0 flex justify-center gap-2 z-20">
-              {listing.images.map((_, idx) => (
-                <div 
-                  key={idx} 
-                  className={`w-1.5 h-1.5 rounded-full shadow-sm transition-all ${idx === currentImageIndex ? 'bg-white scale-125' : 'bg-white/50'}`}
-                />
-              ))}
-            </div>
-          </>
-        )}
-
-        {/* Sold Overlay */}
-        {listing.isSold && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/30 backdrop-blur-[2px] z-10">
-            <div className="bg-white/90 px-8 py-3 rounded-2xl transform -rotate-12 shadow-2xl border-4 border-red-500">
-              <span className="text-4xl font-black text-red-500 tracking-widest uppercase">SOLD</span>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Content */}
-      <div className={`relative z-0 ${isPipitV2 ? 'px-6 pt-6' : 'p-5 -mt-6 bg-white rounded-t-3xl'}`}>
+        {/* Content Card */}
+        <div className="bg-white rounded-2xl border border-[#E8DDD4] p-6 shadow-sm">
         <div className="flex justify-between items-start mb-2">
           <div className="flex-1 pr-4">
             <span className={`text-xs font-semibold uppercase tracking-wide ${isPipitV2 ? 'text-[#2D9B8C]' : 'text-[#2D9B8C]'}`}>{listing.category}</span>
@@ -396,7 +421,7 @@ const ListingDetail = () => {
               ${listing.price}
             </div>
             {listing.originalPrice && (
-              <span className="text-xs text-[#B8A395] line-through mt-1">Retail ${listing.originalPrice}</span>
+              <span className="text-xs text-[#B8A395] line-through mt-1" title="Price stated by seller, not verified">Was ${listing.originalPrice}</span>
             )}
             {!dealAnalysis && (
               <button 
@@ -448,7 +473,7 @@ const ListingDetail = () => {
                  </div>
                  <p className="text-sm font-medium italic mb-2 text-[#6B5D52]">"{dealAnalysis.verdict}: {dealAnalysis.explanation}"</p>
                  <div className="flex justify-between text-xs text-[#9A8578] mb-2">
-                    <span>Retail: ${dealAnalysis.estimatedRetailPrice}</span>
+                    <span>Market Retail: ${dealAnalysis.estimatedRetailPrice}</span>
                     <span className="text-green-600 font-bold">{Math.round(dealAnalysis.savingsPercentage)}% Savings</span>
                  </div>
 
@@ -470,17 +495,17 @@ const ListingDetail = () => {
         )}
 
         {/* Safety Status */}
-        <div onClick={() => setShowSafetyModal(true)} className={`my-6 rounded-xl border overflow-hidden cursor-pointer transition-colors ${isPipitV2 ? 'bg-[#F5EDE6]/50 border-[#E8DDD4]' : 'bg-[#F0FAF8]/50 border-brand-100 active:bg-[#F0FAF8]'}`}>
+        <div onClick={() => setShowSafetyModal(true)} className={`my-6 rounded-xl border overflow-hidden cursor-pointer transition-colors ${isPipitV2 ? 'bg-[#F5EDE6]/50 border-[#E8DDD4]' : 'bg-[#F0FAF8]/50 border-[#2D9B8C]/20 active:bg-[#F0FAF8]'}`}>
            <div className="p-3 flex items-start gap-3">
               <SafetyBadge isVerified={listing.isSafetyVerified} size="lg" />
               <div className="flex-1">
-                <p className={`text-xs mt-1 leading-relaxed ${isPipitV2 ? 'text-[#6B5D52]' : 'text-brand-800'}`}>
+                <p className={`text-xs mt-1 leading-relaxed ${isPipitV2 ? 'text-[#6B5D52]' : 'text-[#4A3F37]'}`}>
                   {listing.isSafetyVerified 
                     ? "This item has passed our AI-powered CPSC recall database check." 
                     : "This item requires manual safety verification."}
                 </p>
               </div>
-              <ChevronRight className={`w-4 h-4 self-center ${isPipitV2 ? 'text-[#2D9B8C]' : 'text-brand-300'}`} />
+              <ChevronRight className={`w-4 h-4 self-center ${isPipitV2 ? 'text-[#2D9B8C]' : 'text-[#2D9B8C]/30'}`} />
            </div>
         </div>
 
@@ -550,38 +575,40 @@ const ListingDetail = () => {
           </button>
         </div>
       </div>
+      </div>
 
-      {/* Sticky Action Bar */}
-      <div className={`fixed bottom-0 left-0 right-0 p-4 border-t max-w-md mx-auto z-50 ${isPipitV2 ? 'bg-[#FFFCF9] border-[#E8DDD4]' : 'bg-white border-[#F5EDE6]'}`}>
+      {/* Action Bar - Mobile: inline bottom, Desktop: fixed side panel */}
+
+      {/* Mobile Action Bar */}
+      <div className={`lg:hidden p-4 pb-safe mt-4 border-t ${isPipitV2 ? 'bg-[#FFFCF9] border-[#E8DDD4]' : 'bg-white border-[#F5EDE6]'}`}>
         {isOwnListing ? (
           <div className="grid grid-cols-2 gap-3">
              {listing.isSold ? (
                <>
-                 <button disabled className="bg-[#E8DDD4] text-[#B8A395] font-semibold py-3.5 rounded-xl flex items-center justify-center gap-2 cursor-not-allowed">
-                  <CheckCircle className="w-5 h-5" /> Sold
+                 <button disabled className="bg-[#E8DDD4] text-[#B8A395] font-semibold py-3.5 rounded-full flex items-center justify-center gap-2 cursor-not-allowed">
+                  ✅ Sold
                 </button>
-                <button onClick={handleDelete} className="bg-red-50 text-red-600 font-semibold py-3.5 rounded-xl flex items-center justify-center gap-2 hover:bg-red-100 transition-colors">
-                  <Trash2 className="w-5 h-5" /> Delete
+                <button onClick={handleDelete} className="bg-red-50 text-red-600 font-semibold py-3.5 rounded-full flex items-center justify-center gap-2 hover:bg-red-100 transition-colors">
+                  🗑️ Delete
                 </button>
                </>
              ) : (
                <>
-                <button onClick={() => navigate(`/edit/${listing.id}`)} className="bg-white border-2 border-[#E8DDD4] text-[#4A3F37] font-semibold py-3.5 rounded-xl flex items-center justify-center gap-2 hover:bg-[#F5EDE6] transition-colors">
-                  <Pencil className="w-5 h-5" /> Edit
+                <button onClick={() => navigate(`/edit/${listing.id}`)} className="bg-white border border-[#E8DDD4] text-[#4A3F37] font-semibold py-3.5 rounded-full flex items-center justify-center gap-2 hover:bg-[#F5EDE6] transition-colors">
+                  ✏️ Edit
                 </button>
-                <button onClick={handleMarkSold} className={`font-semibold py-3.5 rounded-xl shadow-lg flex items-center justify-center gap-2 transition-colors ${isPipitV2 ? 'bg-[#2D9B8C] text-white hover:bg-[#247A6F]' : 'bg-[#2D9B8C] text-white hover:bg-[#247A6F]'}`}>
-                  <CheckCircle className="w-5 h-5" /> Mark Sold
+                <button onClick={handleMarkSold} className="font-semibold py-3.5 rounded-full shadow-warm-lg flex items-center justify-center gap-2 transition-colors bg-[#2D9B8C] text-white hover:bg-[#247A6F]">
+                  Mark Sold
                 </button>
                </>
              )}
           </div>
         ) : (
           listing.isSold ? (
-            <button disabled className="w-full bg-[#E8DDD4] text-[#B8A395] font-semibold py-3.5 rounded-xl flex items-center justify-center gap-2 cursor-not-allowed">
+            <button disabled className="w-full bg-[#E8DDD4] text-[#B8A395] font-semibold py-3.5 rounded-full flex items-center justify-center gap-2 cursor-not-allowed">
               This item has been sold
             </button>
           ) : myPendingOffer ? (
-            // Show pending offer status
             <div className="space-y-2">
               <div className={`p-3 rounded-xl text-center ${myPendingOffer.status === OfferStatus.COUNTERED ? 'bg-yellow-50 border border-yellow-200' : 'bg-[#F5EDE6] border border-[#E8DDD4]'}`}>
                 {myPendingOffer.status === OfferStatus.COUNTERED ? (
@@ -597,57 +624,130 @@ const ListingDetail = () => {
                 )}
               </div>
               <div className="grid grid-cols-2 gap-2">
-                <button
-                  onClick={handleMessageSeller}
-                  className="font-semibold py-3 rounded-xl flex items-center justify-center gap-2 bg-white border border-[#2D9B8C] text-[#2D9B8C]"
-                >
-                  <MessageCircle className="w-4 h-4" />
-                  Chat
+                <button onClick={handleMessageSeller} className="font-semibold py-3 rounded-full flex items-center justify-center gap-2 bg-white border border-[#E8DDD4] text-[#4A3F37] hover:bg-[#F5EDE6]">
+                  💬 Chat
                 </button>
                 {myPendingOffer.status === OfferStatus.COUNTERED && (
                   <button
                     onClick={async () => {
-                      // Accept counter offer - create transaction at counter price
                       const txId = await createTransaction(listing.id, myPendingOffer.id, myPendingOffer.counterAmount);
                       showToast('Counter offer accepted!', 'success');
                       navigate(`/transaction/${txId}`);
                     }}
-                    className="font-semibold py-3 rounded-xl flex items-center justify-center gap-2 bg-[#2D9B8C] text-white"
+                    className="font-semibold py-3 rounded-full flex items-center justify-center gap-2 bg-[#2D9B8C] text-white shadow-warm-md"
                   >
-                    <CheckCircle className="w-4 h-4" />
                     Accept ${myPendingOffer.counterAmount}
                   </button>
                 )}
               </div>
             </div>
           ) : (
-            <div className="space-y-2">
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  onClick={handleMessageSeller}
-                  className={`font-semibold py-3.5 rounded-xl flex items-center justify-center gap-2 transition-colors ${isPipitV2 ? 'bg-white border border-[#E8DDD4] text-[#4A3F37]' : 'bg-[#E8DDD4] text-[#4A3F37] hover:bg-gray-200'}`}
-                >
-                  <MessageCircle className="w-5 h-5" />
-                  Chat
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <button onClick={handleMessageSeller} className="font-semibold py-3.5 rounded-full flex items-center justify-center gap-2 transition-colors bg-white border border-[#E8DDD4] text-[#4A3F37] hover:bg-[#F5EDE6]">
+                  💬 Chat
                 </button>
-                <button
-                  onClick={handleMakeOffer}
-                  className={`font-semibold py-3.5 rounded-xl flex items-center justify-center gap-2 transition-colors ${isPipitV2 ? 'bg-white border border-[#2D9B8C] text-[#2D9B8C]' : 'bg-[#E8DDD4] text-[#4A3F37] hover:bg-gray-200'}`}
-                >
-                  <Tag className="w-5 h-5" />
-                  Make Offer
+                <button onClick={handleMakeOffer} className="font-semibold py-3.5 rounded-full flex items-center justify-center gap-2 transition-colors bg-white border border-[#E8DDD4] text-[#4A3F37] hover:bg-[#F5EDE6]">
+                  💰 Make Offer
                 </button>
               </div>
-              <button
-                onClick={handleRequestToBuy}
-                className={`w-full font-semibold py-3.5 rounded-xl shadow-lg flex items-center justify-center gap-2 transition-colors ${isPipitV2 ? 'bg-[#2D9B8C] text-white hover:bg-[#247A6F]' : 'bg-[#2D9B8C] text-white hover:bg-[#247A6F]'}`}
-              >
-                <ShoppingBag className="w-5 h-5" />
-                {activeTransaction ? 'View Request' : `Buy Now • $${listing.price}`}
+              <button onClick={handleRequestToBuy} className="w-full font-semibold py-3.5 rounded-full shadow-warm-lg flex items-center justify-center gap-2 transition-colors bg-[#2D9B8C] text-white hover:bg-[#247A6F]">
+                {activeTransaction ? 'View Request' : `Buy Now · $${listing.price}`}
               </button>
             </div>
           )
         )}
+      </div>
+
+      {/* Desktop Fixed Side Panel */}
+      <div className="hidden lg:block fixed left-8 top-1/2 -translate-y-1/2 z-40 w-48">
+        <div className="bg-white rounded-2xl shadow-lg border border-[#E8DDD4] p-4 space-y-3">
+          {/* Price */}
+          <div className="text-center pb-3 border-b border-[#E8DDD4]">
+            <p className="text-2xl font-bold text-[#4A3F37]">${listing.price}</p>
+            {listing.originalPrice && (
+              <p className="text-sm text-[#B8A395] line-through">${listing.originalPrice}</p>
+            )}
+          </div>
+
+          {isOwnListing ? (
+            listing.isSold ? (
+              <>
+                <button disabled className="w-full bg-[#E8DDD4] text-[#B8A395] font-semibold py-2.5 rounded-full text-sm cursor-not-allowed">
+                  ✅ Sold
+                </button>
+                <button onClick={handleDelete} className="w-full bg-red-50 text-red-600 font-semibold py-2.5 rounded-full text-sm hover:bg-red-100">
+                  🗑️ Delete
+                </button>
+              </>
+            ) : (
+              <>
+                <button onClick={() => navigate(`/edit/${listing.id}`)} className="w-full bg-white border border-[#E8DDD4] text-[#4A3F37] font-semibold py-2.5 rounded-full text-sm hover:bg-[#F5EDE6]">
+                  ✏️ Edit Listing
+                </button>
+                <button onClick={handleMarkSold} className="w-full bg-[#2D9B8C] text-white font-semibold py-2.5 rounded-full text-sm hover:bg-[#247A6F]">
+                  Mark as Sold
+                </button>
+              </>
+            )
+          ) : listing.isSold ? (
+            <button disabled className="w-full bg-[#E8DDD4] text-[#B8A395] font-semibold py-2.5 rounded-full text-sm cursor-not-allowed">
+              Sold
+            </button>
+          ) : myPendingOffer ? (
+            <>
+              <div className={`p-2 rounded-lg text-center text-xs ${myPendingOffer.status === OfferStatus.COUNTERED ? 'bg-yellow-50 border border-yellow-200' : 'bg-[#F5EDE6]'}`}>
+                {myPendingOffer.status === OfferStatus.COUNTERED ? (
+                  <p className="font-medium text-yellow-800">Counter: ${myPendingOffer.counterAmount}</p>
+                ) : (
+                  <p className="font-medium text-[#4A3F37]">Pending: ${myPendingOffer.amount}</p>
+                )}
+              </div>
+              <button onClick={handleMessageSeller} className="w-full bg-white border border-[#E8DDD4] text-[#4A3F37] font-semibold py-2.5 rounded-full text-sm hover:bg-[#F5EDE6]">
+                💬 Chat
+              </button>
+              {myPendingOffer.status === OfferStatus.COUNTERED && (
+                <button
+                  onClick={async () => {
+                    const txId = await createTransaction(listing.id, myPendingOffer.id, myPendingOffer.counterAmount);
+                    showToast('Counter offer accepted!', 'success');
+                    navigate(`/transaction/${txId}`);
+                  }}
+                  className="w-full bg-[#2D9B8C] text-white font-semibold py-2.5 rounded-full text-sm"
+                >
+                  Accept ${myPendingOffer.counterAmount}
+                </button>
+              )}
+            </>
+          ) : (
+            <>
+              <button onClick={handleRequestToBuy} className="w-full bg-[#2D9B8C] text-white font-semibold py-2.5 rounded-full text-sm hover:bg-[#247A6F] shadow-sm">
+                {activeTransaction ? 'View Request' : 'Buy Now'}
+              </button>
+              <button onClick={handleMakeOffer} className="w-full bg-white border border-[#E8DDD4] text-[#4A3F37] font-semibold py-2.5 rounded-full text-sm hover:bg-[#F5EDE6]">
+                💰 Make Offer
+              </button>
+              <button onClick={handleMessageSeller} className="w-full bg-white border border-[#E8DDD4] text-[#4A3F37] font-semibold py-2.5 rounded-full text-sm hover:bg-[#F5EDE6]">
+                💬 Message
+              </button>
+            </>
+          )}
+
+          {/* Favorite button */}
+          {!isOwnListing && (
+            <button
+              onClick={handleToggleFavorite}
+              className={`w-full py-2.5 rounded-full text-sm font-medium flex items-center justify-center gap-2 ${
+                isFavorite
+                  ? 'bg-red-50 text-red-500 border border-red-200'
+                  : 'bg-[#F5EDE6] text-[#6B5D52] hover:bg-[#E8DDD4]'
+              }`}
+            >
+              <Heart className={`w-4 h-4 ${isFavorite ? 'fill-current' : ''}`} />
+              {isFavorite ? 'Saved' : 'Save'}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Safety Info Modal */}
@@ -657,7 +757,7 @@ const ListingDetail = () => {
               <button onClick={() => setShowSafetyModal(false)} className="absolute top-4 right-4 p-1 rounded-full hover:bg-[#E8DDD4]"><X className="w-5 h-5 text-[#9A8578]" /></button>
               
               <div className="flex flex-col items-center text-center mb-6">
-                 <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-4 ${isPipitV2 ? 'bg-white border border-[#E8DDD4]' : 'bg-brand-100'}`}>
+                 <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-4 ${isPipitV2 ? 'bg-white border border-[#E8DDD4]' : 'bg-[#F0FAF8]'}`}>
                     <ShieldCheck className={`w-8 h-8 ${isPipitV2 ? 'text-[#2D9B8C]' : 'text-[#2D9B8C]'}`} />
                  </div>
                  <h3 className="text-xl font-bold text-[#4A3F37] mb-2">The Pipit Safety Promise</h3>
@@ -668,14 +768,14 @@ const ListingDetail = () => {
 
               <div className="space-y-4 mb-6">
                  <div className="flex gap-3 text-left">
-                    <ScanLine className={`w-5 h-5 flex-shrink-0 mt-0.5 ${isPipitV2 ? 'text-[#2D9B8C]' : 'text-brand-500'}`} />
+                    <ScanLine className={`w-5 h-5 flex-shrink-0 mt-0.5 ${isPipitV2 ? 'text-[#2D9B8C]' : 'text-[#2D9B8C]'}`} />
                     <div>
                        <h4 className="font-bold text-sm text-[#4A3F37]">Real-Time Check</h4>
                        <p className="text-xs text-[#9A8578]">We scan the title, description, and images for known recalled models.</p>
                     </div>
                  </div>
                  <div className="flex gap-3 text-left">
-                    <ExternalLink className={`w-5 h-5 flex-shrink-0 mt-0.5 ${isPipitV2 ? 'text-[#2D9B8C]' : 'text-brand-500'}`} />
+                    <ExternalLink className={`w-5 h-5 flex-shrink-0 mt-0.5 ${isPipitV2 ? 'text-[#2D9B8C]' : 'text-[#2D9B8C]'}`} />
                     <div>
                        <h4 className="font-bold text-sm text-[#4A3F37]">CPSC Database</h4>
                        <p className="text-xs text-[#9A8578]">Cross-referenced with the official Consumer Product Safety Commission data.</p>
@@ -683,9 +783,9 @@ const ListingDetail = () => {
                  </div>
               </div>
 
-              <button 
+              <button
                 onClick={() => setShowSafetyModal(false)}
-                className={`w-full py-3 text-white font-bold rounded-xl ${isPipitV2 ? 'bg-[#2D9B8C]' : 'bg-[#2D9B8C]'}`}
+                className="w-full py-3 text-white font-bold rounded-full bg-[#2D9B8C] hover:bg-[#247A6F] transition-colors shadow-warm-md"
               >
                 Got it
               </button>
@@ -772,15 +872,12 @@ const ListingDetail = () => {
             <button
               onClick={handleSubmitOffer}
               disabled={submittingOffer || !offerAmount}
-              className="w-full py-3.5 rounded-xl font-bold text-white bg-[#2D9B8C] hover:bg-[#247A6F] disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+              className="w-full py-3.5 rounded-full font-bold text-white bg-[#2D9B8C] hover:bg-[#247A6F] disabled:opacity-50 transition-colors flex items-center justify-center gap-2 shadow-warm-lg"
             >
               {submittingOffer ? (
                 <Loader2 className="w-5 h-5 animate-spin" />
               ) : (
-                <>
-                  <Send className="w-5 h-5" />
-                  Send Offer
-                </>
+                'Send Offer'
               )}
             </button>
 

@@ -51,6 +51,6 @@ describe('ListingCard', () => {
     // We check for the visual presence implies the badge component is rendered
     // Since SafetyBadge test covers the icon, we just ensure no errors here
     const { container } = renderWithRouter(<ListingCard listing={mockListing} />);
-    expect(container.querySelector('.text-brand-500')).toBeInTheDocument(); // ShieldCheck color
+    expect(container.querySelector('.text-\\[\\#2D9B8C\\]')).toBeInTheDocument(); // ShieldCheck color
   });
 });

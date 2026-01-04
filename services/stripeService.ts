@@ -54,17 +54,18 @@ export async function createDashboardLink(accountId: string): Promise<{ url: str
 export interface PaymentIntentResult {
   clientSecret: string;
   paymentIntentId: string;
+  requiresSellerOnboarding?: boolean;
 }
 
 export async function createPaymentIntent(
   amount: number,
-  sellerAccountId: string,
+  sellerAccountId: string | undefined,
   transactionId: string,
   listingTitle: string
 ): Promise<PaymentIntentResult> {
   return callStripeAPI('createPaymentIntent', {
     amount,
-    sellerAccountId,
+    sellerAccountId: sellerAccountId || null, // Send null if undefined
     transactionId,
     listingTitle,
   });
@@ -76,4 +77,51 @@ export async function capturePayment(paymentIntentId: string): Promise<{ status:
 
 export async function cancelPayment(paymentIntentId: string): Promise<{ status: string }> {
   return callStripeAPI('cancelPayment', { paymentIntentId });
+}
+
+// ============================================
+// PAYOUTS
+// ============================================
+
+export interface PayoutResult {
+  transferId: string;
+  payoutId?: string;
+  method: 'instant' | 'standard';
+  arrivalDate: string;
+}
+
+export async function createPayout(
+  accountId: string,
+  amount: number,
+  method: 'instant' | 'standard' = 'standard'
+): Promise<PayoutResult> {
+  return callStripeAPI('createPayout', { accountId, amount, method });
+}
+
+export async function checkInstantPayoutEligibility(
+  accountId: string
+): Promise<{ eligible: boolean; message: string }> {
+  return callStripeAPI('checkInstantPayoutEligibility', { accountId });
+}
+
+// ============================================
+// DELAYED ONBOARDING - TRANSFER TO SELLER
+// ============================================
+
+export interface TransferResult {
+  transferId: string;
+  amount: number;
+  status: string;
+}
+
+export async function transferToSeller(
+  sellerAccountId: string,
+  paymentIntentId: string,
+  transactionId: string
+): Promise<TransferResult> {
+  return callStripeAPI('transferToSeller', {
+    sellerAccountId,
+    paymentIntentId,
+    transactionId,
+  });
 }

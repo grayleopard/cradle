@@ -4,11 +4,12 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useStore } from '../context/StoreContext';
 import { useToast } from '../context/ToastContext';
 import { TransactionStatus, Review } from '../types';
-import { ChevronLeft, Lock, ShieldCheck, CheckCircle, MapPin, Clock, CreditCard, Camera, AlertTriangle, UserCheck, Sparkles, ExternalLink, X, RotateCcw, Loader2, FileText, Star, Download, XCircle, UserPlus, Users, Baby } from 'lucide-react';
+import { ChevronLeft, Lock, ShieldCheck, CheckCircle, MapPin, Clock, CreditCard, Camera, AlertTriangle, UserCheck, Sparkles, ExternalLink, X, RotateCcw, Loader2, FileText, Star, Download, XCircle, UserPlus, Users, Baby, Banknote } from 'lucide-react';
 import SafetyBadge from '../components/SafetyBadge';
 import StripePaymentForm from '../components/StripePaymentForm';
+import StripeOnboarding from '../components/StripeOnboarding';
 import { generateInspectionChecklist } from '../services/geminiService';
-import { capturePayment, cancelPayment } from '../services/stripeService';
+import { capturePayment, cancelPayment, transferToSeller } from '../services/stripeService';
 import { processImage } from '../utils/fileHelpers';
 import { uploadToCloudinary } from '../services/cloudinaryService';
 
@@ -42,6 +43,10 @@ const Transaction = () => {
 
   // Animation State
   const [showConfetti, setShowConfetti] = useState(false);
+
+  // Seller Payout State
+  const [transferring, setTransferring] = useState(false);
+  const [payoutComplete, setPayoutComplete] = useState(false);
 
   const transaction = getTransactionById(id || '');
   if (!transaction) return <div className="p-4">Transaction not found</div>;
@@ -227,6 +232,44 @@ const Transaction = () => {
     showToast(`You're now following ${otherUser.name}!`, "success");
   };
 
+  // Handle payout to seller after they complete Stripe onboarding
+  const handleSellerPayout = async () => {
+    if (!currentUser?.stripeAccountId || !transaction.stripePaymentIntentId) return;
+
+    setTransferring(true);
+    try {
+      await transferToSeller(
+        currentUser.stripeAccountId,
+        transaction.stripePaymentIntentId,
+        transaction.id
+      );
+      setPayoutComplete(true);
+      showToast('🎉 Money is on its way!', 'success');
+    } catch (error: any) {
+      console.error('Transfer failed:', error);
+      showToast(error.message || 'Failed to transfer funds', 'error');
+    } finally {
+      setTransferring(false);
+    }
+  };
+
+  // Calculate seller payout breakdown
+  // Seller pays: Stripe processing (~2.9% + $0.30) from their payout
+  // Note: The total charged was itemPrice * 1.055, so Stripe fee is based on that
+  const itemPrice = transaction.amount; // The listing price
+  const buyerTotal = itemPrice * 1.055; // What buyer paid (item + 5.5% platform fee)
+  const stripeProcessingFee = (buyerTotal * 0.029) + 0.30;
+  const instantPayoutFee = itemPrice * 0.01; // 1% for instant payouts
+  const sellerPayoutStandard = itemPrice - stripeProcessingFee;
+  const sellerPayoutInstant = sellerPayoutStandard - instantPayoutFee;
+  const sellerEarnings = sellerPayoutStandard; // Default to standard
+
+  // Check if seller needs to be paid (completed transaction, seller not onboarded or not yet paid)
+  const sellerNeedsPayout = !isBuyer &&
+    transaction.status === TransactionStatus.COMPLETED &&
+    transaction.stripePaymentIntentId &&
+    !payoutComplete;
+
   // --- Render Helpers ---
 
   const renderStatusBadge = () => {
@@ -349,7 +392,7 @@ const Transaction = () => {
                    <Lock className="w-3 h-3 mt-0.5 flex-shrink-0" />
                    Funds are held in escrow until you inspect the item in person.
                  </div>
-                 <button onClick={() => setShowPaymentModal(true)} disabled={loading} className="w-full bg-brand-600 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2">
+                 <button onClick={() => setShowPaymentModal(true)} disabled={loading} className="w-full bg-[#2D9B8C] text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2">
                    {loading ? "Processing..." : <><CreditCard className="w-4 h-4" /> Pay Securely</>}
                  </button>
                </div>
@@ -377,7 +420,7 @@ const Transaction = () => {
                    </div>
                    <div className="text-xs text-blue-700 mb-3">Tomorrow at 2:00 PM</div>
                    <div className="bg-white p-2 rounded mb-3 text-xs text-[#6B5D52] border border-blue-100 flex gap-2 items-start">
-                      <Sparkles className="w-3 h-3 text-brand-500 flex-shrink-0 mt-0.5" />
+                      <Sparkles className="w-3 h-3 text-[#2D9B8C] flex-shrink-0 mt-0.5" />
                       We will generate a custom safety checklist for this item when you arrive.
                    </div>
                    <button onClick={handleArrived} className="w-full bg-blue-600 text-white py-2 rounded-lg text-sm font-bold">
@@ -388,8 +431,8 @@ const Transaction = () => {
 
              {/* INSPECTION UI */}
              {transaction.status === TransactionStatus.INSPECTION_PENDING && (
-                <div className="mt-4 bg-white border-2 border-brand-500 rounded-xl p-4 shadow-lg animate-in zoom-in-95">
-                   <div className="flex items-center gap-2 mb-4 text-brand-700 font-bold border-b border-brand-100 pb-2">
+                <div className="mt-4 bg-white border-2 border-[#2D9B8C] rounded-xl p-4 shadow-lg animate-in zoom-in-95">
+                   <div className="flex items-center gap-2 mb-4 text-[#247A6F] font-bold border-b border-[#E8DDD4] pb-2">
                      <ShieldCheck className="w-5 h-5" /> Smart Inspection
                    </div>
                    
@@ -399,13 +442,13 @@ const Transaction = () => {
                       </div>
                    ) : (
                       <div className="space-y-4">
-                         <div className="bg-brand-50 rounded-lg p-3 text-xs text-brand-800 border border-brand-100">
+                         <div className="bg-[#F0FAF8] rounded-lg p-3 text-xs text-[#247A6F] border border-[#E8DDD4]">
                             <strong>AI Generated Checklist:</strong> We've created specific checks for this <em>{listing.category}</em>.
                          </div>
 
                          {checklistLoading ? (
                             <div className="py-6 text-center text-[#9A8578] flex flex-col items-center">
-                               <Sparkles className="w-6 h-6 animate-pulse text-brand-500 mb-2" />
+                               <Sparkles className="w-6 h-6 animate-pulse text-[#2D9B8C] mb-2" />
                                <span className="text-xs">Generating safety checks...</span>
                             </div>
                          ) : (
@@ -416,7 +459,7 @@ const Transaction = () => {
                                      type="checkbox" 
                                      checked={!!checkedItems[idx]} 
                                      onChange={() => handleCheckItem(idx)} 
-                                     className="mt-1 w-5 h-5 text-brand-600 rounded" 
+                                     className="mt-1 w-5 h-5 text-[#2D9B8C] rounded" 
                                    />
                                    <span className="text-sm text-[#4A3F37]">{item}</span>
                                  </label>
@@ -426,7 +469,7 @@ const Transaction = () => {
 
                          <div 
                            onClick={() => !photoPreview && fileInputRef.current?.click()}
-                           className={`h-40 border-2 border-dashed rounded-lg flex flex-col items-center justify-center cursor-pointer transition-colors relative overflow-hidden ${photoPreview ? 'border-brand-500' : 'border-gray-300 text-[#B8A395] hover:bg-[#F5EDE6]'}`}
+                           className={`h-40 border-2 border-dashed rounded-lg flex flex-col items-center justify-center cursor-pointer transition-colors relative overflow-hidden ${photoPreview ? 'border-[#2D9B8C]' : 'border-gray-300 text-[#B8A395] hover:bg-[#F5EDE6]'}`}
                          >
                             {photoPreview ? (
                                 <>
@@ -437,7 +480,7 @@ const Transaction = () => {
                                   >
                                     <X className="w-4 h-4" />
                                   </button>
-                                  <div className="absolute bottom-0 left-0 right-0 bg-brand-600/90 text-white text-[10px] text-center py-1">
+                                  <div className="absolute bottom-0 left-0 right-0 bg-[#2D9B8C]/90 text-white text-[10px] text-center py-1">
                                     Verification Photo Attached
                                   </div>
                                 </>
@@ -486,6 +529,80 @@ const Transaction = () => {
              
              {transaction.status === TransactionStatus.COMPLETED && (
                 <div className="mt-4 animate-in slide-in-from-bottom-4 duration-500">
+
+                   {/* Seller Get Paid Section */}
+                   {sellerNeedsPayout && (
+                     <div className="mb-6">
+                       {!currentUser?.stripeOnboarded ? (
+                         <StripeOnboarding
+                           pendingEarnings={sellerPayoutStandard}
+                           transactionId={transaction.id}
+                           onComplete={handleSellerPayout}
+                         />
+                       ) : (
+                         <div className="bg-[#F0FAF8] border border-[#2D9B8C]/20 rounded-2xl p-5">
+                           <h3 className="font-serif text-lg font-bold text-[#4A3F37] mb-4">
+                             🎉 Your item sold!
+                           </h3>
+
+                           {/* Payout Breakdown */}
+                           <div className="bg-white rounded-xl p-4 mb-4 border border-[#E8DDD4]">
+                             <div className="space-y-2 text-sm">
+                               <div className="flex justify-between">
+                                 <span className="text-[#6B5D52]">Item sold for</span>
+                                 <span className="font-medium text-[#4A3F37]">${itemPrice.toFixed(2)}</span>
+                               </div>
+                               <div className="flex justify-between text-[#9A8578]">
+                                 <span>Payment processing</span>
+                                 <span>-${stripeProcessingFee.toFixed(2)}</span>
+                               </div>
+                               <div className="border-t border-dashed border-[#E8DDD4] pt-2 mt-2">
+                                 <div className="flex justify-between font-bold text-[#4A3F37]">
+                                   <span>You receive (standard)</span>
+                                   <span className="text-[#2D9B8C]">${sellerPayoutStandard.toFixed(2)}</span>
+                                 </div>
+                               </div>
+                               <div className="flex justify-between text-xs text-[#B8A395]">
+                                 <span>Or with instant payout (-1%)</span>
+                                 <span>${sellerPayoutInstant.toFixed(2)}</span>
+                               </div>
+                             </div>
+                           </div>
+
+                           <p className="text-xs text-[#6B5D52] mb-4">
+                             Standard payout arrives in 2-3 business days. Instant payout (1% fee) arrives in minutes.
+                           </p>
+
+                           <button
+                             onClick={handleSellerPayout}
+                             disabled={transferring}
+                             className="w-full bg-[#2D9B8C] text-white px-6 py-3 rounded-full font-bold flex items-center justify-center gap-2 hover:bg-[#247A6F] transition-colors disabled:opacity-50 shadow-warm-md"
+                           >
+                             {transferring ? (
+                               <Loader2 className="w-5 h-5 animate-spin" />
+                             ) : (
+                               <Banknote className="w-5 h-5" />
+                             )}
+                             {transferring ? 'Transferring...' : 'Get Paid Now'}
+                           </button>
+                         </div>
+                       )}
+                     </div>
+                   )}
+
+                   {/* Payout Complete */}
+                   {!isBuyer && payoutComplete && (
+                     <div className="mb-6 bg-green-50 border border-green-100 rounded-xl p-4 flex items-center gap-3">
+                       <CheckCircle className="w-6 h-6 text-green-600" />
+                       <div>
+                         <h3 className="font-bold text-green-900 text-sm">Money Transferred!</h3>
+                         <p className="text-xs text-green-700">
+                           ${sellerEarnings.toFixed(2)} has been sent to your account.
+                         </p>
+                       </div>
+                     </div>
+                   )}
+
                    {/* Receipt Card */}
                    <div className="bg-white border border-[#E8DDD4] rounded-xl p-0 overflow-hidden shadow-sm mb-6">
                       <div className="bg-[#F5EDE6] p-4 border-b border-[#F5EDE6] flex justify-between items-center">
@@ -642,7 +759,7 @@ const Transaction = () => {
       </div>
 
       {/* Payment Modal */}
-      {showPaymentModal && sellerStripeAccountId && (
+      {showPaymentModal && (
         <div className="absolute inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center p-4 animate-in fade-in">
            <div className="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl animate-in slide-in-from-bottom-10 max-h-[90vh] overflow-y-auto">
               <div className="flex justify-between items-center mb-4">
@@ -660,29 +777,6 @@ const Transaction = () => {
                 onSuccess={handlePaymentSuccess}
                 onCancel={() => setShowPaymentModal(false)}
               />
-           </div>
-        </div>
-      )}
-
-      {/* Seller not onboarded warning */}
-      {showPaymentModal && !sellerStripeAccountId && (
-        <div className="absolute inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center p-4 animate-in fade-in">
-           <div className="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl animate-in slide-in-from-bottom-10">
-              <div className="flex justify-between items-center mb-4">
-                 <h3 className="text-lg font-bold text-[#4A3F37]">Payment Unavailable</h3>
-                 <button onClick={() => setShowPaymentModal(false)} className="p-1 hover:bg-[#E8DDD4] rounded-full"><X className="w-5 h-5 text-[#9A8578]" /></button>
-              </div>
-              <div className="bg-yellow-50 border border-yellow-100 rounded-lg p-4 mb-4">
-                <p className="text-sm text-yellow-800">
-                  The seller hasn't set up their payment account yet. Please contact them through chat to arrange payment.
-                </p>
-              </div>
-              <button
-                onClick={() => setShowPaymentModal(false)}
-                className="w-full py-3 bg-[#E8DDD4] text-[#4A3F37] font-bold rounded-xl"
-              >
-                Close
-              </button>
            </div>
         </div>
       )}

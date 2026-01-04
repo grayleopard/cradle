@@ -68,8 +68,8 @@ const SafetyCheck = () => {
       <div className="flex-1 p-6 overflow-y-auto">
         {!result ? (
           <div className="max-w-md mx-auto animate-in fade-in duration-500">
-            <div className="bg-brand-50 rounded-2xl p-6 text-center mb-8">
-               <ScanLine className="w-12 h-12 text-brand-600 mx-auto mb-3" />
+            <div className="bg-[#F0FAF8] rounded-2xl p-6 text-center mb-8">
+               <ScanLine className="w-12 h-12 text-[#2D9B8C] mx-auto mb-3" />
                <h2 className="text-xl font-bold text-gray-900 mb-2">Is your gear safe?</h2>
                <p className="text-sm text-gray-600">
                  Upload a photo or describe an item. We use Google Search to check the latest CPSC recall database.
@@ -79,7 +79,7 @@ const SafetyCheck = () => {
             <div className="space-y-6">
                <div 
                  onClick={() => fileInputRef.current?.click()}
-                 className={`border-2 border-dashed rounded-xl p-8 flex flex-col items-center justify-center cursor-pointer transition-all ${image ? 'border-brand-500 bg-brand-50/30' : 'border-gray-200 hover:bg-gray-50'}`}
+                 className={`border-2 border-dashed rounded-xl p-8 flex flex-col items-center justify-center cursor-pointer transition-all ${image ? 'border-[#2D9B8C] bg-[#F0FAF8]/30' : 'border-gray-200 hover:bg-gray-50'}`}
                >
                  {image ? (
                    <div className="relative w-full h-48">
@@ -111,14 +111,14 @@ const SafetyCheck = () => {
                    value={description}
                    onChange={(e) => setDescription(e.target.value)}
                    placeholder="e.g. Fisher Price Rock 'n Play Sleeper"
-                   className="w-full p-4 bg-gray-50 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-500 h-24"
+                   className="w-full p-4 bg-gray-50 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#2D9B8C] h-24"
                  />
                </div>
 
                <button
                  onClick={handleCheck}
                  disabled={loading || (!image && !description)}
-                 className="w-full py-4 bg-brand-600 text-white font-bold rounded-xl shadow-lg hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-all"
+                 className="w-full py-4 bg-[#2D9B8C] text-white font-bold rounded-xl shadow-lg hover:bg-[#247A6F] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-all"
                >
                  {loading ? (
                    <>

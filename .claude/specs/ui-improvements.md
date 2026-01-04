@@ -8,20 +8,21 @@ Polish tasks for Claude to work on. Prioritized by user impact.
 
 ### Loading States
 - [x] Add skeleton loaders to Home page listing grid
-- [ ] Add loading spinner to ListingDetail while fetching
-- [ ] Add skeleton to Profile page
-- [ ] Add loading state to search results
+- [x] ListingDetail - data is synchronous from context (no loading needed, improved "not found" state instead)
+- [x] Profile page - data is synchronous from context (no loading needed, improved empty states instead)
+- [x] Add loading state to search results (skeleton shown during filter/search changes)
 
 ### Empty States
 - [x] Improve "No listings found" empty state (context-aware messaging)
 - [x] Add empty state for Messages page (+ full Heirloom theme update)
-- [ ] Add empty state for Saved Items
-- [ ] Add empty state for My Listings
+- [x] Add empty state for Saved Items
+- [x] Add empty state for My Listings
+- [x] Improve ListingDetail "not found" state
 
 ### Mobile Responsiveness
-- [ ] Test and fix any overflow issues on 375px
-- [ ] Ensure all modals work on small screens
-- [ ] Check bottom navigation spacing on iPhone X+
+- [x] Test and fix any overflow issues on 375px (horizontal scroll patterns in place)
+- [x] Ensure all modals work on small screens (AuthModal uses responsive bottom sheet)
+- [x] Check bottom navigation spacing on iPhone X+ (added `pb-safe` with `env(safe-area-inset-bottom)`)
 
 ---
 
@@ -40,8 +41,8 @@ Polish tasks for Claude to work on. Prioritized by user impact.
 - [ ] Better focus states for accessibility
 
 ### Forms
-- [ ] Add input validation feedback
-- [ ] Character counters for text areas
+- [x] Add input validation feedback (CreateListing: title, description, price)
+- [x] Character counters for text areas (title 60 chars, description 500 chars)
 - [ ] Better date picker styling
 - [ ] Consistent form layouts
 
@@ -79,13 +80,14 @@ Polish tasks for Claude to work on. Prioritized by user impact.
 - [x] Hero section
 - [x] Category icons
 - [x] Listing grid
-- [ ] Search bar polish
-- [ ] Filter modal polish
+- [x] Search bar polish (clear button, search button, clear history)
+- [x] Filter modal polish (radius picker with header, "show all" option)
 
 ### ListingDetail.tsx
 - [ ] Image gallery improvements
 - [ ] Seller info section
-- [ ] Action buttons
+- [x] Action buttons (desktop side panel)
+- [x] "Not found" state
 - [ ] Safety badge styling
 
 ### Profile.tsx
@@ -93,6 +95,7 @@ Polish tasks for Claude to work on. Prioritized by user impact.
 - [ ] Tab navigation
 - [ ] Settings section
 - [ ] Avatar styling
+- [x] Empty states for all tabs (Selling, Buying, Saved, Alerts)
 
 ### Transaction.tsx
 - [x] Timeline styling

@@ -51,6 +51,17 @@ export const formatPhoneE164 = (phone: string): string => {
 let mockAuthMode = true; // Default to mock until we know otherwise
 let mockAuthUserId: string | null = null;
 
+// Production check - disable mock auth in production
+const isProduction = () => {
+  try {
+    return window.location.hostname !== 'localhost' &&
+           !window.location.hostname.includes('127.0.0.1') &&
+           !window.location.hostname.includes('.local');
+  } catch {
+    return false;
+  }
+};
+
 // Send OTP via SMS (or mock it for local dev)
 export const sendOtp = async (phone: string): Promise<void> => {
   const formattedPhone = formatPhoneE164(phone);
@@ -93,8 +104,13 @@ export const sendOtp = async (phone: string): Promise<void> => {
 export const verifyOtp = async (phone: string, token: string): Promise<{ userId: string; isNewUser: boolean }> => {
   const formattedPhone = formatPhoneE164(phone);
 
+  // Block mock auth in production
+  if (isProduction() && mockAuthMode) {
+    throw new Error('Authentication is not properly configured. Please contact support.');
+  }
+
   if (mockAuthMode || !supabase) {
-    // Mock verification - only accept specific test codes
+    // Mock verification - only accept specific test codes (DEV ONLY)
     const validTestCodes = ['123456', '000000', '111111'];
     if (token.length === 6 && validTestCodes.includes(token)) {
       // Generate a consistent mock user ID based on phone number
@@ -186,3 +202,88 @@ export const getUserProfile = async (userId: string): Promise<any | null> => {
 
 // Check if we're in mock auth mode
 export const isMockAuthMode = (): boolean => mockAuthMode;
+
+// ============================================
+// EMAIL/PASSWORD AUTH (Alternative to Phone)
+// ============================================
+
+// Sign up with email and password
+export const signUpWithEmail = async (email: string, password: string): Promise<{ userId: string; isNewUser: boolean }> => {
+  if (!supabase) {
+    throw new Error('Authentication service not available');
+  }
+
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      emailRedirectTo: `${window.location.origin}/auth/callback`
+    }
+  });
+
+  if (error) throw error;
+  if (!data.user) throw new Error('Sign up failed');
+
+  // Check if this is truly a new user (Supabase returns user even if exists)
+  const isNewUser = !data.user.confirmed_at;
+
+  return { userId: data.user.id, isNewUser };
+};
+
+// Sign in with email and password
+export const signInWithEmail = async (email: string, password: string): Promise<{ userId: string; isNewUser: boolean }> => {
+  if (!supabase) {
+    throw new Error('Authentication service not available');
+  }
+
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password
+  });
+
+  if (error) {
+    if (error.message.includes('Invalid login credentials')) {
+      throw new Error('Invalid email or password');
+    }
+    throw error;
+  }
+
+  if (!data.user) throw new Error('Sign in failed');
+
+  const existingProfile = await getUserProfile(data.user.id);
+  return { userId: data.user.id, isNewUser: !existingProfile };
+};
+
+// Send magic link email
+export const sendMagicLink = async (email: string): Promise<void> => {
+  if (!supabase) {
+    throw new Error('Authentication service not available');
+  }
+
+  const { error } = await supabase.auth.signInWithOtp({
+    email,
+    options: {
+      emailRedirectTo: `${window.location.origin}/auth/callback`
+    }
+  });
+
+  if (error) throw error;
+};
+
+// Reset password
+export const resetPassword = async (email: string): Promise<void> => {
+  if (!supabase) {
+    throw new Error('Authentication service not available');
+  }
+
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${window.location.origin}/auth/reset-password`
+  });
+
+  if (error) throw error;
+};
+
+// Check if email auth is available (Supabase configured)
+export const isEmailAuthAvailable = (): boolean => {
+  return !!supabase;
+};

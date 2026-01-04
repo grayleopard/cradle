@@ -98,7 +98,7 @@ const ParentVerification = () => {
 
             <button 
               onClick={() => setStep('upload')}
-              className="w-full py-4 bg-brand-600 text-white font-bold rounded-xl shadow-lg hover:bg-brand-700 transition-all"
+              className="w-full py-4 bg-[#2D9B8C] text-white font-bold rounded-xl shadow-lg hover:bg-[#247A6F] transition-all"
             >
               Start Verification
             </button>
@@ -112,10 +112,10 @@ const ParentVerification = () => {
             
             <div 
               onClick={handleUpload}
-              className="border-2 border-dashed border-gray-300 rounded-2xl p-10 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50 hover:border-brand-300 transition-all mb-8"
+              className="border-2 border-dashed border-gray-300 rounded-2xl p-10 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50 hover:border-[#2D9B8C]/50 transition-all mb-8"
             >
               <Upload className="w-8 h-8 text-gray-400 mb-2" />
-              <span className="text-brand-600 font-medium">Tap to Upload</span>
+              <span className="text-[#2D9B8C] font-medium">Tap to Upload</span>
             </div>
 
             <p className="text-xs text-gray-400">By continuing, you agree to our Terms of Service.</p>
@@ -124,7 +124,7 @@ const ParentVerification = () => {
 
         {step === 'processing' && (
           <div className="animate-in fade-in duration-500">
-            <Loader2 className="w-12 h-12 text-brand-600 animate-spin mx-auto mb-4" />
+            <Loader2 className="w-12 h-12 text-[#2D9B8C] animate-spin mx-auto mb-4" />
             <h2 className="text-xl font-bold text-gray-900">Verifying...</h2>
             <p className="text-gray-500">This will just take a moment.</p>
           </div>

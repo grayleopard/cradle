@@ -46,7 +46,7 @@ const Compare = () => {
          <Scale className="w-16 h-16 text-gray-200 mb-4" />
          <h2 className="text-xl font-bold text-gray-900 mb-2">Compare Queue Empty</h2>
          <p className="text-gray-500 mb-6">Select items from the home feed to compare them side-by-side.</p>
-         <button onClick={() => navigate('/')} className="px-6 py-3 bg-brand-600 text-white rounded-xl font-bold">Go to Feed</button>
+         <button onClick={() => navigate('/')} className="px-6 py-3 bg-[#2D9B8C] text-white rounded-xl font-bold">Go to Feed</button>
        </div>
     );
   }
@@ -72,7 +72,7 @@ const Compare = () => {
              </button>
              <img src={item.images[0]} className="w-full h-20 object-cover rounded-md mb-2 bg-gray-100" />
              <div className="text-[10px] font-bold text-gray-900 line-clamp-1">{item.title}</div>
-             <div className="text-xs text-brand-600 font-bold">${item.price}</div>
+             <div className="text-xs text-[#2D9B8C] font-bold">${item.price}</div>
           </div>
         ))}
         
@@ -85,7 +85,7 @@ const Compare = () => {
 
       {selectedListings.length >= 2 && !result && !loading && (
         <div className="p-4">
-           <button onClick={handleAnalyze} className="w-full py-4 bg-brand-600 text-white rounded-xl font-bold shadow-lg flex items-center justify-center gap-2">
+           <button onClick={handleAnalyze} className="w-full py-4 bg-[#2D9B8C] text-white rounded-xl font-bold shadow-lg flex items-center justify-center gap-2">
              <Sparkles className="w-5 h-5" /> Analyze Differences
            </button>
         </div>
@@ -93,7 +93,7 @@ const Compare = () => {
 
       {loading && (
         <div className="p-12 flex flex-col items-center justify-center text-gray-500">
-           <Loader2 className="w-10 h-10 animate-spin text-brand-500 mb-4" />
+           <Loader2 className="w-10 h-10 animate-spin text-[#2D9B8C] mb-4" />
            <p className="font-medium">Gemini is analyzing features...</p>
         </div>
       )}

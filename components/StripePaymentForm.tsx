@@ -13,7 +13,7 @@ interface StripePaymentFormProps {
   amount: number;
   platformFee: number;
   total: number;
-  sellerAccountId: string;
+  sellerAccountId?: string; // Optional - if undefined, funds go to platform for later transfer
   transactionId: string;
   listingTitle: string;
   onSuccess: (paymentIntentId: string) => void;
@@ -128,7 +128,7 @@ const PaymentFormContent: React.FC<StripePaymentFormProps> = ({
         <button
           type="submit"
           disabled={!stripe || loading}
-          className="flex-1 py-3 bg-brand-600 text-white font-bold rounded-xl shadow-lg hover:bg-brand-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+          className="flex-1 py-3 bg-[#2D9B8C] text-white font-bold rounded-xl shadow-lg hover:bg-[#247A6F] transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
         >
           {loading ? (
             <Loader2 className="w-4 h-4 animate-spin" />
@@ -174,7 +174,7 @@ const StripePaymentForm: React.FC<StripePaymentFormProps> = (props) => {
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-8">
-        <Loader2 className="w-8 h-8 animate-spin text-brand-600 mb-3" />
+        <Loader2 className="w-8 h-8 animate-spin text-[#2D9B8C] mb-3" />
         <span className="text-sm text-gray-500">Setting up secure payment...</span>
       </div>
     );
@@ -212,7 +212,7 @@ const StripePaymentForm: React.FC<StripePaymentFormProps> = (props) => {
         appearance: {
           theme: 'stripe',
           variables: {
-            colorPrimary: '#C68E68',
+            colorPrimary: '#2D9B8C',
             borderRadius: '8px',
           },
         },

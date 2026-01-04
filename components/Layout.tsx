@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { Home, PlusCircle, User as UserIcon, MessageCircle, MapPin, Scale, Settings, LogOut, ChevronDown } from 'lucide-react';
+import { Home, PlusCircle, User as UserIcon, MessageCircle, Scale, Settings, LogOut, ChevronDown } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useStore } from '../context/StoreContext';
 import Concierge from './Concierge';
@@ -8,13 +8,14 @@ import AuthModal from './AuthModal';
 export const Layout = ({ children }: { children?: React.ReactNode }) => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { locationStatus, compareIds, messages, currentUser, logout } = useStore();
+  const { compareIds, messages, currentUser, logout } = useStore();
   const mainRef = useRef<HTMLDivElement>(null);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
 
   const isActive = (path: string) => location.pathname === path;
   const isListingDetail = location.pathname.startsWith('/listing/');
+  const isChatPage = location.pathname.startsWith('/chat/');
 
   // Calculate unread messages
   const unreadCount = currentUser ? messages.filter(m =>
@@ -22,9 +23,10 @@ export const Layout = ({ children }: { children?: React.ReactNode }) => {
   ).length : 0;
 
   useEffect(() => {
-    if (mainRef.current) {
-      mainRef.current.scrollTop = 0;
-    }
+    // Scroll window to top on route change - use multiple methods for cross-browser support
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
   }, [location.pathname]);
 
   // Close user menu when clicking outside
@@ -35,12 +37,6 @@ export const Layout = ({ children }: { children?: React.ReactNode }) => {
       return () => document.removeEventListener('click', handleClick);
     }
   }, [showUserMenu]);
-
-  const getLocationText = () => {
-    if (locationStatus === 'locating') return 'Locating...';
-    if (locationStatus === 'located') return 'Near You';
-    return 'Auburn, WA';
-  };
 
   // Desktop nav items (Profile in user dropdown)
   const desktopNavItems = [
@@ -73,21 +69,17 @@ export const Layout = ({ children }: { children?: React.ReactNode }) => {
 
   return (
     <div className="min-h-screen bg-[#FFFCF9]">
-      {/* Desktop Top Navigation - Hidden on mobile */}
-      {!isListingDetail && (
+      {/* Desktop Top Navigation - Hidden on mobile and special pages */}
+      {!isListingDetail && !isChatPage && (
         <header className="hidden lg:block sticky top-0 z-50 border-b bg-[#FFFCF9] border-[#E8DDD4]">
           <div className="max-w-7xl mx-auto px-6">
             <div className="flex items-center justify-between h-16">
               {/* Logo */}
-              <Link to="/" className="flex items-center gap-3">
-                <div className="w-9 h-9 flex items-center justify-center text-white font-bold text-lg rounded-xl bg-[#2D9B8C]">
-                  P
-                </div>
-                <div>
-                  <h1 className="font-bold text-lg leading-tight text-[#4A3F37] font-serif">
-                    Pipit
-                  </h1>
-                </div>
+              <Link to="/" className="flex items-center gap-2">
+                <span className="text-2xl">🐦</span>
+                <h1 className="font-bold text-xl leading-tight text-[#4A3F37] font-serif">
+                  pipit
+                </h1>
               </Link>
 
               {/* Center Navigation */}
@@ -113,10 +105,10 @@ export const Layout = ({ children }: { children?: React.ReactNode }) => {
                       to={item.path}
                       className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 -mb-[1px] transition-colors ${getNavLinkStyle(isActive(item.path))}`}
                     >
-                      <item.icon className={`w-4 h-4 ${item.isAction && !isActive(item.path) ? 'text-brand-500' : ''}`} />
+                      <item.icon className={`w-4 h-4 ${item.isAction && !isActive(item.path) ? 'text-[#2D9B8C]' : ''}`} />
                       <span>{item.label}</span>
-                      {item.badge && item.badge > 0 && (
-                        <span className="bg-red-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+                      {item.badge > 0 && (
+                        <span className="bg-[#E8725C] text-white text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
                           {item.badge > 9 ? '9+' : item.badge}
                         </span>
                       )}
@@ -125,14 +117,8 @@ export const Layout = ({ children }: { children?: React.ReactNode }) => {
                 })}
               </nav>
 
-              {/* Right Section - Location & User */}
+              {/* Right Section - User */}
               <div className="flex items-center gap-4">
-                {/* Location */}
-                <div className="flex items-center gap-1.5 text-sm text-[#6B5D52]">
-                  <MapPin className="w-4 h-4 text-[#2D9B8C]" />
-                  <span>{getLocationText()}</span>
-                </div>
-
                 {/* User Menu / Sign In */}
                 {currentUser ? (
                   <div className="relative">
@@ -193,12 +179,15 @@ export const Layout = ({ children }: { children?: React.ReactNode }) => {
         </header>
       )}
 
-      {/* Mobile Header - Hidden on desktop and listing detail */}
-      {!isListingDetail && (
+      {/* Mobile Header - Hidden on desktop, listing detail, and chat */}
+      {!isListingDetail && !isChatPage && (
         <header className="lg:hidden sticky top-0 z-50 px-4 py-3 flex items-center justify-between border-b backdrop-blur-md bg-[#FFFCF9] border-[#E8DDD4]">
           <div className="flex items-center gap-2">
             {location.pathname !== '/' && (
-              <h1 className="font-serif text-xl text-[#4A3F37]">Pipit</h1>
+              <Link to="/" className="flex items-center gap-1.5">
+                <span className="text-xl">🐦</span>
+                <h1 className="font-serif text-xl text-[#4A3F37]">pipit</h1>
+              </Link>
             )}
           </div>
         </header>
@@ -207,9 +196,9 @@ export const Layout = ({ children }: { children?: React.ReactNode }) => {
       {/* Main Content */}
       <main
         ref={mainRef}
-        className="min-h-screen pb-24 lg:pb-8"
+        className={`${isChatPage || isListingDetail ? '' : 'min-h-screen pb-24 lg:pb-8'}`}
       >
-        <div className="max-w-7xl mx-auto">
+        <div className={isListingDetail || isChatPage ? '' : 'max-w-7xl mx-auto'}>
           {children}
         </div>
 
@@ -230,9 +219,9 @@ export const Layout = ({ children }: { children?: React.ReactNode }) => {
         )}
       </main>
 
-      {/* Mobile Bottom Nav - Hidden on desktop and listing detail */}
-      {!isListingDetail && (
-        <nav className="lg:hidden fixed bottom-0 left-0 right-0 px-6 py-2 flex justify-around items-center z-50 border-t bg-white border-[#F5EDE6]">
+      {/* Mobile Bottom Nav - Hidden on desktop, listing detail, and chat */}
+      {!isListingDetail && !isChatPage && (
+        <nav className="lg:hidden fixed bottom-0 left-0 right-0 px-6 py-2 pb-safe flex justify-around items-center z-50 border-t bg-white border-[#F5EDE6]">
           {mobileNavItems.map((item: any) => {
             // Handle Sign In button
             if (item.isSignIn) {
@@ -289,8 +278,8 @@ export const Layout = ({ children }: { children?: React.ReactNode }) => {
                         className="w-6 h-6"
                         style={{ color: active ? '#2D9B8C' : '#B8A395' }}
                       />
-                      {item.badge && item.badge > 0 && (
-                        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] font-bold h-4 w-4 flex items-center justify-center rounded-full border border-white">
+                      {item.badge > 0 && (
+                        <span className="absolute -top-1.5 -right-1.5 bg-[#E8725C] text-white text-[9px] font-bold h-4 min-w-[16px] px-1 flex items-center justify-center rounded-full border-2 border-white shadow-sm">
                           {item.badge > 9 ? '9+' : item.badge}
                         </span>
                       )}

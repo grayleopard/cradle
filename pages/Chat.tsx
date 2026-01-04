@@ -220,7 +220,7 @@ const Chat = () => {
   };
 
   return (
-    <div className={`flex flex-col h-[100dvh] pb-[60px] ${isPipitV2 ? 'bg-[#FFFCF9]' : 'bg-[#F5EDE6]'}`}>
+    <div className={`flex flex-col h-[100dvh] ${isPipitV2 ? 'bg-[#FFFCF9]' : 'bg-[#F5EDE6]'}`}>
       <div className={`border-b p-3 sticky top-0 z-10 shadow-sm ${isPipitV2 ? 'bg-[#FFFCF9] border-[#E8DDD4]' : 'bg-white border-[#F5EDE6]'}`}>
         <div className="flex items-center gap-3 mb-2">
           <button onClick={() => navigate(-1)} className="p-1.5 hover:opacity-70 rounded-full">
@@ -229,12 +229,12 @@ const Chat = () => {
           <img src={listing.images[0]} className="w-10 h-10 rounded-lg object-cover border border-[#E8DDD4]" alt="Item" />
           <div className="flex-1 min-w-0">
              <h2 className={`font-bold text-sm truncate ${isPipitV2 ? 'text-[#4A3F37] font-serif tracking-wide' : 'text-gray-900'}`}>{otherUser?.name || 'User'}</h2>
-             <p className={`text-xs font-medium ${isPipitV2 ? 'text-[#2D9B8C]' : 'text-brand-600'}`}>
+             <p className={`text-xs font-medium ${isPipitV2 ? 'text-[#2D9B8C]' : 'text-[#2D9B8C]'}`}>
                {listing.title} • {listing.isSold ? <span className="text-red-500 font-bold">SOLD</span> : `$${listing.price}`}
              </p>
           </div>
           {isSeller && !listing.isSold && !activeTransaction && (
-            <button onClick={handleMarkAsSold} className={`text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1 transition-colors ${isPipitV2 ? 'bg-[#2D9B8C]/10 text-[#2D9B8C]' : 'bg-brand-50 text-brand-700 hover:bg-brand-100'}`}>
+            <button onClick={handleMarkAsSold} className={`text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1 transition-colors ${isPipitV2 ? 'bg-[#2D9B8C]/10 text-[#2D9B8C]' : 'bg-[#F0FAF8] text-[#247A6F] hover:bg-[#F0FAF8]'}`}>
               <CheckCircle className="w-3 h-3" /> Mark Sold
             </button>
           )}
@@ -242,7 +242,7 @@ const Chat = () => {
         
         {/* Persistent "Scheduled" Card */}
         {activeTransaction && isMeetupScheduled && (
-          <div className={`p-3 rounded-xl shadow-md animate-in slide-in-from-top-2 ${isPipitV2 ? 'bg-[#4A3F37] text-white' : 'bg-gradient-to-r from-brand-600 to-brand-700 text-white'}`}>
+          <div className={`p-3 rounded-xl shadow-md animate-in slide-in-from-top-2 ${isPipitV2 ? 'bg-[#4A3F37] text-white' : 'bg-gradient-to-r from-[#2D9B8C] to-[#247A6F] text-white'}`}>
              <div className="flex justify-between items-start mb-2">
                 <div className="flex items-center gap-2 font-bold text-sm">
                    <CalendarCheck className="w-4 h-4 opacity-80" /> 
@@ -316,7 +316,7 @@ const Chat = () => {
             <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
               <div className={`max-w-[75%] px-4 py-2.5 rounded-2xl text-sm shadow-sm 
                   ${isMe 
-                    ? (isPipitV2 ? 'bg-[#2D9B8C] text-white rounded-br-none' : 'bg-brand-600 text-white rounded-br-none') 
+                    ? (isPipitV2 ? 'bg-[#2D9B8C] text-white rounded-br-none' : 'bg-[#2D9B8C] text-white rounded-br-none') 
                     : (isPipitV2 ? 'bg-white border border-[#E8DDD4] text-[#4A3F37] rounded-bl-none' : 'bg-white border border-[#F5EDE6] text-gray-800 rounded-bl-none')
                   }`}>
                 {msg.text}
@@ -365,9 +365,9 @@ const Chat = () => {
                        <div 
                          key={item.id} 
                          onClick={() => handleToggleBundleItem(item.id)}
-                         className={`flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer ${selectedBundleItems.includes(item.id) ? 'border-brand-500 bg-brand-50' : 'border-[#E8DDD4] hover:border-brand-200'}`}
+                         className={`flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer ${selectedBundleItems.includes(item.id) ? 'border-[#2D9B8C] bg-[#F0FAF8]' : 'border-[#E8DDD4] hover:border-[#2D9B8C]/30'}`}
                        >
-                          <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${selectedBundleItems.includes(item.id) ? 'bg-brand-500 border-brand-500' : 'border-gray-300'}`}>
+                          <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${selectedBundleItems.includes(item.id) ? 'bg-[#F0FAF8]0 border-[#2D9B8C]' : 'border-gray-300'}`}>
                              {selectedBundleItems.includes(item.id) && <CheckCircle className="w-3.5 h-3.5 text-white" />}
                           </div>
                           <img src={item.images[0]} className="w-12 h-12 rounded-lg object-cover bg-[#E8DDD4]" />
@@ -386,7 +386,7 @@ const Chat = () => {
                     <span className="font-bold text-gray-900">{selectedBundleItems.length + 1}</span>
                  </div>
                  
-                 <div className="bg-[#F5EDE6] p-3 rounded-xl flex items-center gap-2 mb-4 border border-[#E8DDD4] focus-within:ring-2 focus-within:ring-brand-500 focus-within:border-brand-500">
+                 <div className="bg-[#F5EDE6] p-3 rounded-xl flex items-center gap-2 mb-4 border border-[#E8DDD4] focus-within:ring-2 focus-within:ring-[#2D9B8C] focus-within:border-[#2D9B8C]">
                     <DollarSign className="w-5 h-5 text-[#B8A395]" />
                     <input 
                       type="number" 
@@ -435,13 +435,13 @@ const Chat = () => {
          </div>
       )}
 
-      <form onSubmit={handleSend} className={`p-3 border-t flex gap-2 items-center bg-white border-[#F5EDE6] sticky bottom-0 z-20`}>
-        <button type="button" onClick={() => setShowMeetupOptions(!showMeetupOptions)} className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${showMeetupOptions ? (isPipitV2 ? 'bg-[#2D9B8C] text-white' : 'bg-brand-100 text-brand-600') : (isPipitV2 ? 'bg-white border border-[#E8DDD4] text-[#2D9B8C]' : 'bg-[#E8DDD4] text-[#9A8578]')}`}><MapPin className="w-5 h-5" /></button>
+      <form onSubmit={handleSend} className={`p-3 pb-safe border-t flex gap-2 items-center bg-white border-[#F5EDE6] sticky bottom-0 z-20`}>
+        <button type="button" onClick={() => setShowMeetupOptions(!showMeetupOptions)} className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${showMeetupOptions ? (isPipitV2 ? 'bg-[#2D9B8C] text-white' : 'bg-[#F0FAF8] text-[#2D9B8C]') : (isPipitV2 ? 'bg-white border border-[#E8DDD4] text-[#2D9B8C]' : 'bg-[#E8DDD4] text-[#9A8578]')}`}><MapPin className="w-5 h-5" /></button>
         {!isSeller && (
             <button 
               type="button" 
               onClick={() => setShowBundleModal(true)} 
-              className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${isPipitV2 ? 'bg-white border border-[#E8DDD4] text-[#2D9B8C]' : 'bg-[#E8DDD4] text-[#9A8578] hover:bg-brand-100 hover:text-brand-600'}`} 
+              className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${isPipitV2 ? 'bg-white border border-[#E8DDD4] text-[#2D9B8C]' : 'bg-[#E8DDD4] text-[#9A8578] hover:bg-[#F0FAF8] hover:text-[#2D9B8C]'}`} 
               title="Request Bundle"
             >
               <PackagePlus className="w-5 h-5" />
@@ -456,7 +456,7 @@ const Chat = () => {
           placeholder="Type a message..." 
           className={`flex-1 rounded-full px-4 py-2.5 text-sm outline-none transition-all ${isPipitV2 ? 'bg-white border border-[#E8DDD4] text-[#4A3F37] placeholder:text-[#247A6F]/50 focus:ring-1 focus:ring-[#2D9B8C]' : 'bg-[#F5EDE6] border border-[#E8DDD4] text-gray-900 placeholder:text-[#B8A395]'}`} 
         />
-        <button type="submit" disabled={!inputText.trim()} className={`w-10 h-10 rounded-full flex items-center justify-center disabled:opacity-50 ${isPipitV2 ? 'bg-[#2D9B8C] text-white' : 'bg-brand-600 text-white'}`}><Send className="w-4 h-4 ml-0.5" /></button>
+        <button type="submit" disabled={!inputText.trim()} className={`w-10 h-10 rounded-full flex items-center justify-center disabled:opacity-50 ${isPipitV2 ? 'bg-[#2D9B8C] text-white' : 'bg-[#2D9B8C] text-white'}`}><Send className="w-4 h-4 ml-0.5" /></button>
       </form>
     </div>
   );

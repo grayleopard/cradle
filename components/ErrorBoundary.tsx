@@ -46,7 +46,7 @@ class ErrorBoundary extends Component<Props, State> {
       }
 
       return (
-        <div className="min-h-screen bg-[#F9F6F0] flex items-center justify-center p-6">
+        <div className="min-h-screen bg-[#FFFCF9] flex items-center justify-center p-6">
           <div className="max-w-md w-full text-center">
             {/* Icon */}
             <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -54,7 +54,7 @@ class ErrorBoundary extends Component<Props, State> {
             </div>
 
             {/* Message */}
-            <h1 className="text-2xl font-bold font-serif text-[#2F3E2E] mb-2">
+            <h1 className="text-2xl font-bold font-serif text-[#4A3F37] mb-2">
               Oops! Something went wrong
             </h1>
             <p className="text-[#5C5C5C] mb-6">
@@ -74,14 +74,14 @@ class ErrorBoundary extends Component<Props, State> {
             <div className="flex gap-3 justify-center">
               <button
                 onClick={this.handleGoHome}
-                className="px-6 py-3 bg-white border border-[#E3D5CA] text-[#2F3E2E] rounded-xl font-medium flex items-center gap-2 hover:bg-[#F5EBE0] transition-colors"
+                className="px-6 py-3 bg-white border border-[#E8DDD4] text-[#4A3F37] rounded-xl font-medium flex items-center gap-2 hover:bg-[#F5EDE6] transition-colors"
               >
                 <Home className="w-5 h-5" />
                 Go Home
               </button>
               <button
                 onClick={this.handleRefresh}
-                className="px-6 py-3 bg-[#C68E68] text-white rounded-xl font-medium flex items-center gap-2 hover:bg-[#B07D5B] transition-colors"
+                className="px-6 py-3 bg-[#2D9B8C] text-white rounded-xl font-medium flex items-center gap-2 hover:bg-[#247A6F] transition-colors"
               >
                 <RefreshCw className="w-5 h-5" />
                 Refresh
@@ -91,7 +91,7 @@ class ErrorBoundary extends Component<Props, State> {
             {/* Support link */}
             <p className="text-xs text-gray-400 mt-8">
               If this keeps happening, please{' '}
-              <a href="mailto:support@pipit.app" className="text-[#C68E68] hover:underline">
+              <a href="mailto:support@pipit.app" className="text-[#2D9B8C] hover:underline">
                 contact support
               </a>
             </p>
