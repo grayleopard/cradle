@@ -276,3 +276,29 @@ export interface Transaction {
   createdAt: string;
   updatedAt: string;
 }
+
+// Notification Types
+export enum NotificationType {
+  NEW_MESSAGE = 'new_message',
+  OFFER_RECEIVED = 'offer_received',
+  OFFER_ACCEPTED = 'offer_accepted',
+  OFFER_DECLINED = 'offer_declined',
+  OFFER_COUNTERED = 'offer_countered',
+  TRANSACTION_UPDATE = 'transaction_update',
+  NEW_FOLLOWER = 'new_follower'
+}
+
+export interface Notification {
+  id: string;
+  userId: string;           // Recipient of the notification
+  type: NotificationType;
+  title: string;
+  message: string;
+  actorId?: string;         // User who triggered the notification
+  actorName?: string;       // Cached name for offline display
+  actorAvatarUrl?: string;  // Cached avatar for offline display
+  referenceId?: string;     // ID of related entity (listing, offer, transaction, user, conversation)
+  referenceType?: 'listing' | 'offer' | 'transaction' | 'user' | 'conversation';
+  isRead: boolean;
+  createdAt: string;
+}

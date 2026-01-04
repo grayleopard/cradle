@@ -40,10 +40,11 @@ These must be done before production launch.
 - [ ] Fuzzy matching
 
 ### Notifications
-- [ ] In-app notifications
-- [ ] New message alerts
-- [ ] Offer updates
-- [ ] Transaction status changes
+- [x] In-app notifications
+- [x] New message alerts
+- [x] Offer updates
+- [x] Transaction status changes
+- [x] New follower alerts
 
 ### Reviews Enhancement
 - [ ] Photo reviews

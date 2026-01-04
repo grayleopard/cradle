@@ -235,6 +235,30 @@ CREATE TABLE IF NOT EXISTS charities (
 );
 
 -- ============================================
+-- NOTIFICATIONS TABLE
+-- ============================================
+CREATE TABLE IF NOT EXISTS notifications (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+  type TEXT NOT NULL,
+  title TEXT NOT NULL,
+  message TEXT NOT NULL,
+  actor_id UUID REFERENCES users(id) ON DELETE SET NULL,
+  actor_name TEXT,
+  actor_avatar_url TEXT,
+  reference_id TEXT,
+  reference_type TEXT,
+  is_read BOOLEAN DEFAULT false,
+
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Indexes for efficient notification queries
+CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_is_read ON notifications(user_id, is_read);
+CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON notifications(created_at DESC);
+
+-- ============================================
 -- ROW LEVEL SECURITY (RLS)
 -- ============================================
 
@@ -248,6 +272,7 @@ ALTER TABLE offers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE transactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE reports ENABLE ROW LEVEL SECURITY;
 ALTER TABLE charities ENABLE ROW LEVEL SECURITY;
+ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
 
 -- Users: Public read, self write
 CREATE POLICY "Users are viewable by everyone" ON users
@@ -338,6 +363,19 @@ CREATE POLICY "Users can view own reports" ON reports
 -- Charities: Public read
 CREATE POLICY "Charities are viewable by everyone" ON charities
   FOR SELECT USING (true);
+
+-- Notifications: User can only access own notifications
+CREATE POLICY "Users can view own notifications" ON notifications
+  FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can create notifications" ON notifications
+  FOR INSERT WITH CHECK (true);
+
+CREATE POLICY "Users can update own notifications" ON notifications
+  FOR UPDATE USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own notifications" ON notifications
+  FOR DELETE USING (auth.uid() = user_id);
 
 -- ============================================
 -- FUNCTIONS & TRIGGERS

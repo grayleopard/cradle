@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
-import { Listing, User, Conversation, Message, Review, Transaction, TransactionStatus, Report, SavedSearch, Offer, OfferStatus, Charity, DonationOption } from '../types';
+import { Listing, User, Conversation, Message, Review, Transaction, TransactionStatus, Report, SavedSearch, Offer, OfferStatus, Charity, DonationOption, Notification, NotificationType } from '../types';
 import { MOCK_LISTINGS, MOCK_USERS, DEFAULT_CHARITY } from '../constants';
 import { calculateDistance, ZIP_COORDINATES } from '../utils/locationHelpers';
 import { supabase, getSession, getUserProfile, signOut as supabaseSignOut } from '../services/supabase';
@@ -77,6 +77,14 @@ interface StoreContextType {
   getActiveCharity: () => Charity;
   updateUserDonationTotal: (amount: number) => void;
 
+  // Notifications
+  notifications: Notification[];
+  unreadNotificationCount: number;
+  addNotification: (notification: Omit<Notification, 'id' | 'createdAt' | 'isRead'>) => void;
+  markNotificationAsRead: (notificationId: string) => void;
+  markAllNotificationsAsRead: () => void;
+  deleteNotification: (notificationId: string) => void;
+
   resetStore: () => void;
 }
 
@@ -91,7 +99,8 @@ const STORAGE_KEYS = {
   TRANSACTIONS: 'cradle_transactions',
   REPORTS: 'cradle_reports',
   COMPARE: 'cradle_compare',
-  OFFERS: 'cradle_offers'
+  OFFERS: 'cradle_offers',
+  NOTIFICATIONS: 'cradle_notifications'
 };
 
 // Helper to safely parse JSON from localStorage
@@ -215,6 +224,21 @@ const mapReportFromDB = (row: any): Report => ({
   status: row.status
 });
 
+const mapNotificationFromDB = (row: any): Notification => ({
+  id: row.id,
+  userId: row.user_id,
+  type: row.type as NotificationType,
+  title: row.title,
+  message: row.message,
+  actorId: row.actor_id,
+  actorName: row.actor_name,
+  actorAvatarUrl: row.actor_avatar_url,
+  referenceId: row.reference_id,
+  referenceType: row.reference_type,
+  isRead: row.is_read,
+  createdAt: row.created_at
+});
+
 export const StoreProvider = ({ children }: { children?: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
 
@@ -236,8 +260,12 @@ export const StoreProvider = ({ children }: { children?: ReactNode }) => {
   const [reports, setReports] = useState<Report[]>(() => safeParse(STORAGE_KEYS.REPORTS, []));
   const [offers, setOffers] = useState<Offer[]>(() => safeParse(STORAGE_KEYS.OFFERS, []));
   const [compareIds, setCompareIds] = useState<string[]>(() => safeParse(STORAGE_KEYS.COMPARE, []));
+  const [notifications, setNotifications] = useState<Notification[]>(() => safeParse(STORAGE_KEYS.NOTIFICATIONS, []));
   const [locationStatus, setLocationStatus] = useState<'idle' | 'locating' | 'located' | 'error'>('idle');
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+
+  // Computed: unread notification count
+  const unreadNotificationCount = notifications.filter(n => !n.isRead).length;
 
   // --- Supabase Data Sync ---
   useEffect(() => {
@@ -313,6 +341,8 @@ export const StoreProvider = ({ children }: { children?: ReactNode }) => {
           setReports(reportsData.map(mapReportFromDB));
         }
 
+        // Note: Notifications are fetched separately when currentUser is available
+
       } catch (err) {
         console.error("Failed to fetch from Supabase:", err);
       } finally {
@@ -322,6 +352,27 @@ export const StoreProvider = ({ children }: { children?: ReactNode }) => {
 
     fetchAllData();
   }, []);
+
+  // Fetch notifications when user is logged in
+  useEffect(() => {
+    if (!supabase || !currentUser) return;
+
+    const fetchNotifications = async () => {
+      if (!supabase) return; // TypeScript null check
+      const { data: notificationsData } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('user_id', currentUser.id)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (notificationsData) {
+        setNotifications(notificationsData.map(mapNotificationFromDB));
+      }
+    };
+
+    fetchNotifications();
+  }, [currentUser?.id]);
 
   // --- Session Restoration on Mount ---
   useEffect(() => {
@@ -430,6 +481,7 @@ export const StoreProvider = ({ children }: { children?: ReactNode }) => {
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.REPORTS, JSON.stringify(reports)); }, [reports]);
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.OFFERS, JSON.stringify(offers)); }, [offers]);
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.COMPARE, JSON.stringify(compareIds)); }, [compareIds]);
+  useEffect(() => { localStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(notifications)); }, [notifications]);
 
   // Generate a unique referral code (6 chars, alphanumeric)
   const generateReferralCode = (userId: string): string => {
@@ -674,6 +726,19 @@ export const StoreProvider = ({ children }: { children?: ReactNode }) => {
     const currentFollowing = currentUser.followingIds || [];
     if (!currentFollowing.includes(targetUserId)) {
       updateUser({ ...currentUser, followingIds: [...currentFollowing, targetUserId] });
+
+      // Notify the user being followed
+      addNotification({
+        userId: targetUserId,
+        type: NotificationType.NEW_FOLLOWER,
+        title: 'New Follower',
+        message: `${currentUser.name} started following you`,
+        actorId: currentUser.id,
+        actorName: currentUser.name,
+        actorAvatarUrl: currentUser.avatarUrl,
+        referenceId: currentUser.id,
+        referenceType: 'user'
+      });
     }
   };
 
@@ -873,6 +938,23 @@ export const StoreProvider = ({ children }: { children?: ReactNode }) => {
         updated_at: new Date().toISOString()
       }).eq('id', conversationId);
     }
+
+    // Create notification for recipient
+    const conversation = conversations.find(c => c.id === conversationId);
+    const recipientId = conversation?.participantIds.find(id => id !== currentUser.id);
+    if (recipientId) {
+      addNotification({
+        userId: recipientId,
+        type: NotificationType.NEW_MESSAGE,
+        title: 'New Message',
+        message: `${currentUser.name}: ${text.substring(0, 50)}${text.length > 50 ? '...' : ''}`,
+        actorId: currentUser.id,
+        actorName: currentUser.name,
+        actorAvatarUrl: currentUser.avatarUrl,
+        referenceId: conversationId,
+        referenceType: 'conversation'
+      });
+    }
   };
 
   const markMessagesAsRead = async (conversationId: string) => {
@@ -960,6 +1042,19 @@ export const StoreProvider = ({ children }: { children?: ReactNode }) => {
       });
     }
 
+    // Notify seller of new offer
+    addNotification({
+      userId: listing.userId,
+      type: NotificationType.OFFER_RECEIVED,
+      title: 'New Offer Received',
+      message: `${currentUser.name} offered $${amount} for "${listing.title}"`,
+      actorId: currentUser.id,
+      actorName: currentUser.name,
+      actorAvatarUrl: currentUser.avatarUrl,
+      referenceId: listingId,
+      referenceType: 'listing'
+    });
+
     return newOffer.id;
   };
 
@@ -994,6 +1089,31 @@ export const StoreProvider = ({ children }: { children?: ReactNode }) => {
         updated_at: new Date().toISOString()
       }).eq('id', offerId);
     }
+
+    // Notify buyer of the response
+    const listing = listings.find(l => l.id === offer.listingId);
+    const notificationTypes: Record<string, { type: NotificationType; title: string }> = {
+      accept: { type: NotificationType.OFFER_ACCEPTED, title: 'Offer Accepted!' },
+      decline: { type: NotificationType.OFFER_DECLINED, title: 'Offer Declined' },
+      counter: { type: NotificationType.OFFER_COUNTERED, title: 'Counter Offer Received' }
+    };
+
+    const notifConfig = notificationTypes[response];
+    const notifMessage = response === 'counter'
+      ? `${currentUser?.name} countered with $${counterAmount} for "${listing?.title}"`
+      : `Your offer on "${listing?.title}" was ${response}ed`;
+
+    addNotification({
+      userId: offer.buyerId,
+      type: notifConfig.type,
+      title: notifConfig.title,
+      message: notifMessage,
+      actorId: currentUser?.id,
+      actorName: currentUser?.name,
+      actorAvatarUrl: currentUser?.avatarUrl,
+      referenceId: offer.listingId,
+      referenceType: 'listing'
+    });
   };
 
   const acceptCounterOffer = async (offerId: string): Promise<string> => {
@@ -1133,6 +1253,37 @@ export const StoreProvider = ({ children }: { children?: ReactNode }) => {
         updated_at: new Date().toISOString()
       }).eq('id', id);
     }
+
+    // Notify the other party of status change
+    const tx = transactions.find(t => t.id === id);
+    if (tx && currentUser) {
+      const recipientId = currentUser.id === tx.buyerId ? tx.sellerId : tx.buyerId;
+      const listing = listings.find(l => l.id === tx.listingId);
+
+      const statusMessages: Record<string, string> = {
+        [TransactionStatus.ACCEPTED]: 'Your purchase request was accepted',
+        [TransactionStatus.PAYMENT_HELD]: 'Payment received, funds secured in escrow',
+        [TransactionStatus.MEETUP_AGREED]: 'Meetup details confirmed',
+        [TransactionStatus.INSPECTION_PENDING]: 'Arrived at meetup location',
+        [TransactionStatus.COMPLETED]: 'Transaction completed! Funds released.',
+        [TransactionStatus.CANCELLED]: 'Transaction was cancelled'
+      };
+
+      const message = statusMessages[status];
+      if (message) {
+        addNotification({
+          userId: recipientId,
+          type: NotificationType.TRANSACTION_UPDATE,
+          title: 'Transaction Update',
+          message: `${message} for "${listing?.title}"`,
+          actorId: currentUser.id,
+          actorName: currentUser.name,
+          actorAvatarUrl: currentUser.avatarUrl,
+          referenceId: id,
+          referenceType: 'transaction'
+        });
+      }
+    }
   };
 
   // --- Charity ---
@@ -1156,6 +1307,74 @@ export const StoreProvider = ({ children }: { children?: ReactNode }) => {
     }
   };
 
+  // --- Notifications ---
+  const addNotification = async (notif: Omit<Notification, 'id' | 'createdAt' | 'isRead'>) => {
+    const newNotification: Notification = {
+      ...notif,
+      id: generateUUID(),
+      isRead: false,
+      createdAt: new Date().toISOString()
+    };
+
+    // Optimistic update
+    setNotifications(prev => [newNotification, ...prev]);
+
+    // Sync to Supabase
+    if (supabase) {
+      await supabase.from('notifications').insert({
+        id: newNotification.id,
+        user_id: notif.userId,
+        type: notif.type,
+        title: notif.title,
+        message: notif.message,
+        actor_id: notif.actorId,
+        actor_name: notif.actorName,
+        actor_avatar_url: notif.actorAvatarUrl,
+        reference_id: notif.referenceId,
+        reference_type: notif.referenceType,
+        is_read: false
+      });
+    }
+  };
+
+  const markNotificationAsRead = async (notificationId: string) => {
+    setNotifications(prev => prev.map(n =>
+      n.id === notificationId ? { ...n, isRead: true } : n
+    ));
+
+    if (supabase) {
+      await supabase
+        .from('notifications')
+        .update({ is_read: true })
+        .eq('id', notificationId);
+    }
+  };
+
+  const markAllNotificationsAsRead = async () => {
+    if (!currentUser) return;
+
+    setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+
+    if (supabase) {
+      await supabase
+        .from('notifications')
+        .update({ is_read: true })
+        .eq('user_id', currentUser.id)
+        .eq('is_read', false);
+    }
+  };
+
+  const deleteNotification = async (notificationId: string) => {
+    setNotifications(prev => prev.filter(n => n.id !== notificationId));
+
+    if (supabase) {
+      await supabase
+        .from('notifications')
+        .delete()
+        .eq('id', notificationId);
+    }
+  };
+
   const resetStore = () => {
     localStorage.clear();
     window.location.reload();
@@ -1174,6 +1393,7 @@ export const StoreProvider = ({ children }: { children?: ReactNode }) => {
       createOffer, respondToOffer, acceptCounterOffer, withdrawOffer, getOffersForListing, getOfferById, getPendingOffersForSeller,
       createTransaction, getTransactionById, updateTransactionStatus, getActiveTransactionForListing,
       activeCharity, getActiveCharity, updateUserDonationTotal,
+      notifications, unreadNotificationCount, addNotification, markNotificationAsRead, markAllNotificationsAsRead, deleteNotification,
       resetStore
     }}>
       {children}

@@ -4,6 +4,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useStore } from '../context/StoreContext';
 import Concierge from './Concierge';
 import AuthModal from './AuthModal';
+import NotificationBell from './NotificationBell';
 
 export const Layout = ({ children }: { children?: React.ReactNode }) => {
   const location = useLocation();
@@ -117,8 +118,11 @@ export const Layout = ({ children }: { children?: React.ReactNode }) => {
                 })}
               </nav>
 
-              {/* Right Section - User */}
-              <div className="flex items-center gap-4">
+              {/* Right Section - Notifications & User */}
+              <div className="flex items-center gap-2">
+                {/* Notification Bell (only for logged in users) */}
+                {currentUser && <NotificationBell />}
+
                 {/* User Menu / Sign In */}
                 {currentUser ? (
                   <div className="relative">
@@ -190,6 +194,12 @@ export const Layout = ({ children }: { children?: React.ReactNode }) => {
               </Link>
             )}
           </div>
+          {/* Mobile notification bell */}
+          {currentUser && (
+            <div className="flex items-center">
+              <NotificationBell isMobile />
+            </div>
+          )}
         </header>
       )}
 
