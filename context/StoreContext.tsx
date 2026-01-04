@@ -224,6 +224,20 @@ const mapReportFromDB = (row: any): Report => ({
   status: row.status
 });
 
+const mapOfferFromDB = (row: any): Offer => ({
+  id: row.id,
+  listingId: row.listing_id,
+  buyerId: row.buyer_id,
+  sellerId: row.seller_id,
+  amount: Number(row.amount),
+  counterAmount: row.counter_amount ? Number(row.counter_amount) : undefined,
+  message: row.message,
+  status: row.status as OfferStatus,
+  expiresAt: row.expires_at,
+  createdAt: row.created_at,
+  updatedAt: row.updated_at
+});
+
 const mapNotificationFromDB = (row: any): Notification => ({
   id: row.id,
   userId: row.user_id,
@@ -352,6 +366,67 @@ export const StoreProvider = ({ children }: { children?: ReactNode }) => {
 
     fetchAllData();
   }, []);
+
+  // Fetch user-specific data when user logs in (conversations, messages, transactions, offers)
+  // This is separate from fetchAllData because RLS policies require auth.uid() to be set
+  useEffect(() => {
+    if (!supabase || !currentUser) return;
+
+    const fetchUserData = async () => {
+      if (!supabase) return; // TypeScript null check
+
+      try {
+        // Fetch conversations for this user
+        const { data: convsData } = await supabase
+          .from('conversations')
+          .select('*')
+          .order('updated_at', { ascending: false });
+
+        if (convsData) {
+          // Fetch messages for user's conversations
+          const { data: msgsData } = await supabase
+            .from('messages')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+          const mappedMessages = msgsData ? msgsData.map(mapMessageFromDB) : [];
+          setMessages(mappedMessages);
+
+          const mappedConvs = convsData.map(conv => {
+            const lastMsg = mappedMessages.find(m => m.conversationId === conv.id);
+            return mapConversationFromDB(conv, lastMsg);
+          });
+          setConversations(mappedConvs);
+        }
+
+        // Fetch transactions for this user
+        const { data: txData } = await supabase
+          .from('transactions')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (txData) {
+          setTransactions(txData.map(mapTransactionFromDB));
+        }
+
+        // Fetch offers for this user
+        const { data: offersData } = await supabase
+          .from('offers')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (offersData) {
+          setOffers(offersData.map(mapOfferFromDB));
+        }
+
+        console.log('[Data] Fetched user-specific data for:', currentUser.name);
+      } catch (err) {
+        console.error("Failed to fetch user data:", err);
+      }
+    };
+
+    fetchUserData();
+  }, [currentUser?.id]);
 
   // Fetch notifications when user is logged in
   useEffect(() => {
