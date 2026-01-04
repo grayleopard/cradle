@@ -5,13 +5,13 @@ import { useStore } from '../context/StoreContext';
 import { useTheme } from '../context/ThemeContext';
 import { useToast } from '../context/ToastContext';
 import { ChevronLeft, Send, Shield, MapPin, CheckCircle, Star, ShoppingBag, AlertTriangle, PackagePlus, Sparkles, CalendarCheck, Clock, CalendarPlus, X, Plus, DollarSign } from 'lucide-react';
-import { Review, TransactionStatus, Listing } from '../types';
+import { Review, TransactionStatus, Listing, OfferStatus } from '../types';
 import { generateSmartReplies, extractMeetingDetails, MeetingDetails } from '../services/geminiService';
 
 const Chat = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { getConversationById, getMessagesByConversationId, getListingById, sendMessage, markMessagesAsRead, currentUser, markAsSold, addReview, getUserById, getActiveTransactionForListing, createTransaction, updateTransactionStatus, listings } = useStore();
+  const { getConversationById, getMessagesByConversationId, getListingById, sendMessage, markMessagesAsRead, currentUser, markAsSold, addReview, getUserById, getActiveTransactionForListing, createTransaction, updateTransactionStatus, listings, getOffersForListing, respondToOffer } = useStore();
   const { theme } = useTheme();
   const { showToast } = useToast();
   
@@ -32,6 +32,10 @@ const Chat = () => {
   const [smartReplies, setSmartReplies] = useState<string[]>([]);
   const [repliesLoading, setRepliesLoading] = useState(false);
   const [detectedPlan, setDetectedPlan] = useState<MeetingDetails | null>(null);
+
+  // Offer Quick Actions State
+  const [showCounterModal, setShowCounterModal] = useState(false);
+  const [counterOfferAmount, setCounterOfferAmount] = useState('');
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -40,6 +44,11 @@ const Chat = () => {
   const listing = conversation ? getListingById(conversation.listingId) : undefined;
   const messages = id ? getMessagesByConversationId(id) : [];
   const activeTransaction = listing ? getActiveTransactionForListing(listing.id) : undefined;
+
+  // Get pending offer for this listing (for seller quick actions)
+  const pendingOffer = listing
+    ? getOffersForListing(listing.id).find(o => o.status === OfferStatus.PENDING)
+    : undefined;
 
   const isSeller = currentUser && listing && currentUser.id === listing.userId;
   const otherParticipantId = conversation?.participantIds.find(pid => pid !== currentUser?.id);
@@ -212,11 +221,37 @@ const Chat = () => {
   const handleAddToCalendar = () => {
     const loc = activeTransaction?.meetupLocation || detectedPlan?.location || '';
     const time = activeTransaction?.meetupTime || detectedPlan?.dateTime || '';
-    
+
     const text = `Pipit Meetup: ${listing.title}`;
     const details = `Meeting with ${otherUser?.name}. Location: ${loc}`;
     const url = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(text)}&details=${encodeURIComponent(details)}&location=${encodeURIComponent(loc)}`;
     window.open(url, '_blank');
+  };
+
+  // Offer Quick Action Handlers
+  const handleAcceptOffer = async () => {
+    if (!pendingOffer) return;
+    await respondToOffer(pendingOffer.id, 'accept');
+    sendMessage(conversation.id, `✅ I've accepted your offer of $${pendingOffer.amount}! Let's arrange a meetup.`);
+    showToast("Offer accepted!", "success");
+  };
+
+  const handleDeclineOffer = async () => {
+    if (!pendingOffer) return;
+    await respondToOffer(pendingOffer.id, 'decline');
+    sendMessage(conversation.id, `Sorry, I can't accept your offer of $${pendingOffer.amount} at this time.`);
+    showToast("Offer declined", "info");
+  };
+
+  const handleCounterOffer = async () => {
+    if (!pendingOffer || !counterOfferAmount) return;
+    const amount = parseFloat(counterOfferAmount);
+    if (isNaN(amount) || amount <= 0) return;
+    await respondToOffer(pendingOffer.id, 'counter', amount);
+    sendMessage(conversation.id, `💰 I've sent a counter-offer of $${amount}. Let me know if that works!`);
+    setShowCounterModal(false);
+    setCounterOfferAmount('');
+    showToast("Counter-offer sent!", "success");
   };
 
   return (
@@ -259,6 +294,43 @@ const Chat = () => {
              <button onClick={handleAddToCalendar} className="mt-3 w-full bg-white/20 hover:bg-white/30 py-1.5 rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition-colors">
                 <CalendarPlus className="w-3 h-3" /> Add to Calendar
              </button>
+          </div>
+        )}
+
+        {/* Pending Offer Quick Actions (for seller) */}
+        {isSeller && pendingOffer && !activeTransaction && (
+          <div className={`mt-2 p-3 rounded-xl border animate-in slide-in-from-top-2 ${isPipitV2 ? 'bg-gradient-to-r from-[#2D9B8C]/10 to-[#247A6F]/10 border-[#2D9B8C]/30' : 'bg-green-50 border-green-200'}`}>
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <DollarSign className={`w-4 h-4 ${isPipitV2 ? 'text-[#2D9B8C]' : 'text-green-600'}`} />
+                <span className={`text-sm font-bold ${isPipitV2 ? 'text-[#4A3F37]' : 'text-gray-900'}`}>
+                  Offer: ${pendingOffer.amount}
+                </span>
+              </div>
+              <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${isPipitV2 ? 'bg-[#2D9B8C]/20 text-[#247A6F]' : 'bg-green-100 text-green-700'}`}>
+                {listing.price > pendingOffer.amount ? `${Math.round((1 - pendingOffer.amount / listing.price) * 100)}% below` : 'At asking'}
+              </span>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={handleAcceptOffer}
+                className={`flex-1 py-2 rounded-lg text-xs font-bold transition-colors ${isPipitV2 ? 'bg-[#2D9B8C] text-white hover:bg-[#247A6F]' : 'bg-green-600 text-white hover:bg-green-700'}`}
+              >
+                Accept
+              </button>
+              <button
+                onClick={() => setShowCounterModal(true)}
+                className={`flex-1 py-2 rounded-lg text-xs font-bold transition-colors ${isPipitV2 ? 'bg-white border border-[#2D9B8C] text-[#2D9B8C] hover:bg-[#2D9B8C]/5' : 'bg-white border border-green-600 text-green-600 hover:bg-green-50'}`}
+              >
+                Counter
+              </button>
+              <button
+                onClick={handleDeclineOffer}
+                className={`flex-1 py-2 rounded-lg text-xs font-bold transition-colors ${isPipitV2 ? 'bg-white border border-[#E8DDD4] text-[#6B5D52] hover:bg-[#F5EDE6]' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+              >
+                Decline
+              </button>
+            </div>
           </div>
         )}
 
@@ -406,6 +478,49 @@ const Chat = () => {
                  </button>
               </div>
            </div>
+        </div>
+      )}
+
+      {/* Counter Offer Modal */}
+      {showCounterModal && pendingOffer && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className={`w-full max-w-sm rounded-2xl p-6 animate-in zoom-in-95 ${isPipitV2 ? 'bg-[#FFFCF9]' : 'bg-white'}`}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className={`text-lg font-bold ${isPipitV2 ? 'text-[#4A3F37] font-serif' : 'text-gray-900'}`}>Counter Offer</h3>
+              <button onClick={() => setShowCounterModal(false)} className="p-1 hover:bg-[#E8DDD4] rounded-full"><X className="w-5 h-5 text-[#9A8578]" /></button>
+            </div>
+            <p className={`text-sm mb-4 ${isPipitV2 ? 'text-[#6B5D52]' : 'text-gray-600'}`}>
+              Their offer: <strong className={isPipitV2 ? 'text-[#4A3F37]' : 'text-gray-900'}>${pendingOffer.amount}</strong>
+              <span className="mx-2">•</span>
+              Asking: <strong className={isPipitV2 ? 'text-[#4A3F37]' : 'text-gray-900'}>${listing.price}</strong>
+            </p>
+            <div className={`p-3 rounded-xl flex items-center gap-2 mb-4 border focus-within:ring-2 focus-within:ring-[#2D9B8C] focus-within:border-[#2D9B8C] ${isPipitV2 ? 'bg-white border-[#E8DDD4]' : 'bg-[#F5EDE6] border-[#E8DDD4]'}`}>
+              <DollarSign className="w-5 h-5 text-[#B8A395]" />
+              <input
+                type="number"
+                placeholder="Your counter price"
+                value={counterOfferAmount}
+                onChange={(e) => setCounterOfferAmount(e.target.value)}
+                className={`bg-transparent w-full outline-none font-bold text-lg ${isPipitV2 ? 'text-[#4A3F37]' : 'text-gray-900'}`}
+                autoFocus
+              />
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowCounterModal(false)}
+                className={`flex-1 py-3 rounded-xl font-bold transition-colors ${isPipitV2 ? 'bg-[#F5EDE6] text-[#6B5D52]' : 'bg-gray-100 text-gray-600'}`}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCounterOffer}
+                disabled={!counterOfferAmount || parseFloat(counterOfferAmount) <= 0}
+                className={`flex-1 py-3 rounded-xl font-bold disabled:opacity-50 transition-colors ${isPipitV2 ? 'bg-[#2D9B8C] text-white hover:bg-[#247A6F]' : 'bg-black text-white hover:bg-gray-800'}`}
+              >
+                Send Counter
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
