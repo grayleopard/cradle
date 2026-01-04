@@ -5,6 +5,7 @@ import { useStore } from '../context/StoreContext';
 import Concierge from './Concierge';
 import AuthModal from './AuthModal';
 import NotificationBell from './NotificationBell';
+import MessagesPanel from './MessagesPanel';
 
 export const Layout = ({ children }: { children?: React.ReactNode }) => {
   const location = useLocation();
@@ -13,6 +14,7 @@ export const Layout = ({ children }: { children?: React.ReactNode }) => {
   const mainRef = useRef<HTMLDivElement>(null);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showMessagesPanel, setShowMessagesPanel] = useState(false);
 
   const isActive = (path: string) => location.pathname === path;
   const isListingDetail = location.pathname.startsWith('/listing/');
@@ -96,6 +98,25 @@ export const Layout = ({ children }: { children?: React.ReactNode }) => {
                       >
                         <item.icon className={`w-4 h-4 ${item.isAction ? 'text-[#2D9B8C]' : ''}`} />
                         <span>{item.label}</span>
+                      </button>
+                    );
+                  }
+
+                  // Messages opens slide-out panel on desktop
+                  if (item.path === '/messages') {
+                    return (
+                      <button
+                        key={item.path}
+                        onClick={() => setShowMessagesPanel(true)}
+                        className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 -mb-[1px] transition-colors ${getNavLinkStyle(showMessagesPanel)}`}
+                      >
+                        <item.icon className="w-4 h-4" />
+                        <span>{item.label}</span>
+                        {item.badge > 0 && (
+                          <span className="bg-[#E8725C] text-white text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+                            {item.badge > 9 ? '9+' : item.badge}
+                          </span>
+                        )}
                       </button>
                     );
                   }
@@ -317,6 +338,12 @@ export const Layout = ({ children }: { children?: React.ReactNode }) => {
       <AuthModal
         isOpen={showAuthModal}
         onClose={() => setShowAuthModal(false)}
+      />
+
+      {/* Messages Panel (Desktop only) */}
+      <MessagesPanel
+        isOpen={showMessagesPanel}
+        onClose={() => setShowMessagesPanel(false)}
       />
     </div>
   );
