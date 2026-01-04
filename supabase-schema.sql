@@ -239,11 +239,11 @@ CREATE TABLE IF NOT EXISTS charities (
 -- ============================================
 CREATE TABLE IF NOT EXISTS notifications (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+  user_id TEXT REFERENCES users(id) ON DELETE CASCADE NOT NULL,
   type TEXT NOT NULL,
   title TEXT NOT NULL,
   message TEXT NOT NULL,
-  actor_id UUID REFERENCES users(id) ON DELETE SET NULL,
+  actor_id TEXT REFERENCES users(id) ON DELETE SET NULL,
   actor_name TEXT,
   actor_avatar_url TEXT,
   reference_id TEXT,
@@ -366,16 +366,16 @@ CREATE POLICY "Charities are viewable by everyone" ON charities
 
 -- Notifications: User can only access own notifications
 CREATE POLICY "Users can view own notifications" ON notifications
-  FOR SELECT USING (auth.uid() = user_id);
+  FOR SELECT USING (auth.uid()::text = user_id);
 
 CREATE POLICY "Users can create notifications" ON notifications
   FOR INSERT WITH CHECK (true);
 
 CREATE POLICY "Users can update own notifications" ON notifications
-  FOR UPDATE USING (auth.uid() = user_id);
+  FOR UPDATE USING (auth.uid()::text = user_id);
 
 CREATE POLICY "Users can delete own notifications" ON notifications
-  FOR DELETE USING (auth.uid() = user_id);
+  FOR DELETE USING (auth.uid()::text = user_id);
 
 -- ============================================
 -- FUNCTIONS & TRIGGERS
