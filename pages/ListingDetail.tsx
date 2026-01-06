@@ -1,21 +1,23 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { useStore } from '../context/StoreContext';
 import { useTheme } from '../context/ThemeContext';
 import { useToast } from '../context/ToastContext';
-import { ChevronLeft, Share2, Heart, MapPin, UserCheck, MessageCircle, Cigarette, Dog, Shield, Pencil, CheckCircle, Trash2, ChevronRight, Flag, ShoppingBag, ExternalLink, Sparkles, Loader2, TrendingUp, DollarSign, Home, X, ScanLine, ShieldCheck, Star, Tag, Send } from 'lucide-react';
+import { ChevronLeft, Share2, Heart, MapPin, UserCheck, MessageCircle, Cigarette, Dog, Shield, Pencil, CheckCircle, Trash2, ChevronRight, Flag, ShoppingBag, ExternalLink, Sparkles, Loader2, TrendingUp, DollarSign, Home, X, ScanLine, ShieldCheck, Star, Tag, Send, Copy, Twitter, Facebook, MessageSquare, Package, Truck } from 'lucide-react';
 import SafetyBadge from '../components/SafetyBadge';
 import ImageWithSkeleton from '../components/ImageWithSkeleton';
 import AuthModal from '../components/AuthModal';
+import ListingCard from '../components/ListingCard';
 import { analyzeDeal, DealAnalysisError } from '../services/geminiService';
 import { DealAnalysis, OfferStatus } from '../types';
+import { getSimilarListings, getMoreFromSeller } from '../utils/recommendations';
 
 const ListingDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const { getListingById, startConversation, sendMessage, currentUser, getUserById, markAsSold, deleteListing, toggleFavorite, createTransaction, getActiveTransactionForListing, reportListing, getReviewsByUserId, createOffer, getOffersForListing } = useStore();
+  const { listings, getListingById, startConversation, sendMessage, currentUser, getUserById, markAsSold, deleteListing, toggleFavorite, createTransaction, getActiveTransactionForListing, reportListing, getReviewsByUserId, createOffer, getOffersForListing } = useStore();
   const { theme } = useTheme();
   const { showToast } = useToast();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -26,6 +28,9 @@ const ListingDetail = () => {
   const [showSafetyModal, setShowSafetyModal] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [pendingAction, setPendingAction] = useState<'message' | 'buy' | 'favorite' | 'offer' | null>(null);
+
+  // Share Modal State
+  const [showShareMenu, setShowShareMenu] = useState(false);
 
   // Offer Modal State
   const [showOfferModal, setShowOfferModal] = useState(false);
@@ -73,6 +78,42 @@ const ListingDetail = () => {
       setDealAnalysis(null);
     }
   }, [id, listing?.dealAnalysis]);
+
+  // Track recently viewed listings
+  useEffect(() => {
+    if (!listing || listing.userId === currentUser?.id) return; // Don't track own listings
+
+    const key = 'pipit_recently_viewed';
+    const saved = localStorage.getItem(key);
+    const viewed: string[] = saved ? JSON.parse(saved) : [];
+
+    // Add to front, remove duplicates, limit to 8
+    const updated = [listing.id, ...viewed.filter(id => id !== listing.id)].slice(0, 8);
+    localStorage.setItem(key, JSON.stringify(updated));
+  }, [listing?.id, listing?.userId, currentUser?.id]);
+
+  // Get similar listings (You Might Like)
+  const similarListings = useMemo(() => {
+    if (!listing) return [];
+    return getSimilarListings(listing, listings, { limit: 4 });
+  }, [listing, listings]);
+
+  // Get more from this seller
+  const moreFromSeller = useMemo(() => {
+    if (!listing) return [];
+    return getMoreFromSeller(listing.userId, listings, listing.id, 4);
+  }, [listing, listings]);
+
+  // Get bundle-eligible items from the same seller
+  const bundleEligibleItems = useMemo(() => {
+    if (!listing || !listing.bundleEligible) return [];
+    return listings.filter(l =>
+      l.userId === listing.userId &&
+      l.id !== listing.id &&
+      l.bundleEligible &&
+      !l.isSold
+    ).slice(0, 4);
+  }, [listing, listings]);
 
   if (!listing) {
     return (
@@ -242,24 +283,53 @@ const ListingDetail = () => {
     showToast(isFavorite ? 'Removed from favorites' : 'Added to favorites', 'success');
   };
 
-  const handleShare = async () => {
-    const shareData = {
-      title: `Check out this ${listing.title} on Pipit`,
-      text: `I found this ${listing.title} for $${listing.price} on Pipit - the safest way to buy baby gear!`,
-      url: window.location.href,
-    };
+  const handleShare = () => {
+    setShowShareMenu(!showShareMenu);
+  };
 
-    if (navigator.share) {
+  const shareUrl = window.location.href;
+  const shareText = `Check out this ${listing.title} for $${listing.price} on Pipit!`;
+
+  const shareToTwitter = () => {
+    const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`;
+    window.open(url, '_blank', 'width=550,height=420');
+    setShowShareMenu(false);
+    showToast('Opening Twitter');
+  };
+
+  const shareToFacebook = () => {
+    const url = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`;
+    window.open(url, '_blank', 'width=550,height=420');
+    setShowShareMenu(false);
+    showToast('Opening Facebook');
+  };
+
+  const shareToWhatsApp = () => {
+    const url = `https://wa.me/?text=${encodeURIComponent(shareText + ' ' + shareUrl)}`;
+    window.open(url, '_blank');
+    setShowShareMenu(false);
+    showToast('Opening WhatsApp');
+  };
+
+  const copyLink = () => {
+    navigator.clipboard.writeText(shareUrl);
+    setShowShareMenu(false);
+    showToast('Link copied to clipboard');
+  };
+
+  const nativeShare = async () => {
+    if ('share' in navigator && typeof navigator.share === 'function') {
       try {
-        await navigator.share(shareData);
-        showToast('Opened share options');
+        await navigator.share({
+          title: listing.title,
+          text: shareText,
+          url: shareUrl,
+        });
       } catch (err) {
-        console.error('Error sharing:', err);
+        // User cancelled or error
       }
-    } else {
-      navigator.clipboard.writeText(window.location.href);
-      showToast('Link copied to clipboard');
     }
+    setShowShareMenu(false);
   };
 
   const handleReport = () => {
@@ -339,12 +409,76 @@ const ListingDetail = () => {
           </div>
 
           <div className="flex gap-2">
-            <button
-              onClick={handleShare}
-              className="p-2 rounded-full hover:bg-[#F5EDE6] transition-colors text-[#4A3F37]"
-            >
-              <Share2 className="w-5 h-5" />
-            </button>
+            <div className="relative">
+              <button
+                onClick={handleShare}
+                className="p-2 rounded-full hover:bg-[#F5EDE6] transition-colors text-[#4A3F37]"
+              >
+                <Share2 className="w-5 h-5" />
+              </button>
+
+              {/* Share Dropdown Menu */}
+              {showShareMenu && (
+                <>
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setShowShareMenu(false)}
+                  />
+                  <div className="absolute right-0 top-12 z-50 w-56 bg-white rounded-xl shadow-warm-lg border border-[#E8DDD4] overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+                    <div className="p-2">
+                      {'share' in navigator && (
+                        <button
+                          onClick={nativeShare}
+                          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-[#F5EDE6] transition-colors text-left"
+                        >
+                          <div className="w-8 h-8 rounded-full bg-[#2D9B8C]/10 flex items-center justify-center">
+                            <Share2 className="w-4 h-4 text-[#2D9B8C]" />
+                          </div>
+                          <span className="text-sm font-medium text-[#4A3F37]">More Options...</span>
+                        </button>
+                      )}
+                      <button
+                        onClick={shareToTwitter}
+                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-[#F5EDE6] transition-colors text-left"
+                      >
+                        <div className="w-8 h-8 rounded-full bg-[#1DA1F2]/10 flex items-center justify-center">
+                          <Twitter className="w-4 h-4 text-[#1DA1F2]" />
+                        </div>
+                        <span className="text-sm font-medium text-[#4A3F37]">Share on X</span>
+                      </button>
+                      <button
+                        onClick={shareToFacebook}
+                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-[#F5EDE6] transition-colors text-left"
+                      >
+                        <div className="w-8 h-8 rounded-full bg-[#1877F2]/10 flex items-center justify-center">
+                          <Facebook className="w-4 h-4 text-[#1877F2]" />
+                        </div>
+                        <span className="text-sm font-medium text-[#4A3F37]">Share on Facebook</span>
+                      </button>
+                      <button
+                        onClick={shareToWhatsApp}
+                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-[#F5EDE6] transition-colors text-left"
+                      >
+                        <div className="w-8 h-8 rounded-full bg-[#25D366]/10 flex items-center justify-center">
+                          <MessageSquare className="w-4 h-4 text-[#25D366]" />
+                        </div>
+                        <span className="text-sm font-medium text-[#4A3F37]">Share on WhatsApp</span>
+                      </button>
+                      <div className="border-t border-[#E8DDD4] my-1" />
+                      <button
+                        onClick={copyLink}
+                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-[#F5EDE6] transition-colors text-left"
+                      >
+                        <div className="w-8 h-8 rounded-full bg-[#6B5D52]/10 flex items-center justify-center">
+                          <Copy className="w-4 h-4 text-[#6B5D52]" />
+                        </div>
+                        <span className="text-sm font-medium text-[#4A3F37]">Copy Link</span>
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
             <button
               onClick={handleToggleFavorite}
               className={`p-2 rounded-full hover:bg-[#F5EDE6] transition-colors ${isFavorite ? 'text-red-500' : 'text-[#4A3F37]'}`}
@@ -521,6 +655,48 @@ const ListingDetail = () => {
           </div>
         </div>
 
+        {/* Delivery Options */}
+        <div className="mb-6">
+          <h3 className={`font-semibold mb-3 ${isPipitV2 ? 'text-[#4A3F37] font-serif text-lg' : 'text-[#4A3F37]'}`}>Delivery</h3>
+          <div className="flex flex-wrap gap-2">
+            {/* Local Pickup - always available unless shipping only */}
+            {(!listing.deliveryMethod || listing.deliveryMethod !== 'shipping') && (
+              <div className="flex items-center gap-2 px-3 py-2 bg-[#F5EDE6] rounded-xl">
+                <MapPin className="w-4 h-4 text-[#6B5D52]" />
+                <div>
+                  <span className="text-sm font-medium text-[#4A3F37]">Local Pickup</span>
+                  <span className="text-xs text-[#9A8578] block">{listing.distanceMiles} miles away</span>
+                </div>
+              </div>
+            )}
+
+            {/* Shipping option */}
+            {listing.offersShipping && (
+              <div className={`flex items-center gap-2 px-3 py-2 rounded-xl ${
+                listing.shippingPrice === 0
+                  ? 'bg-green-50 border border-green-200'
+                  : 'bg-[#F0FAF8] border border-[#2D9B8C]/20'
+              }`}>
+                <Truck className={`w-4 h-4 ${listing.shippingPrice === 0 ? 'text-green-600' : 'text-[#2D9B8C]'}`} />
+                <div>
+                  <span className={`text-sm font-medium ${listing.shippingPrice === 0 ? 'text-green-700' : 'text-[#4A3F37]'}`}>
+                    {listing.shippingPrice === 0 ? 'Free Shipping' : `Ships for $${listing.shippingPrice}`}
+                  </span>
+                  <span className="text-xs text-[#9A8578] block">Ships nationwide</span>
+                </div>
+              </div>
+            )}
+
+            {/* If neither - fallback to local pickup */}
+            {!listing.offersShipping && listing.deliveryMethod === 'shipping' && (
+              <div className="flex items-center gap-2 px-3 py-2 bg-yellow-50 rounded-xl border border-yellow-200">
+                <MapPin className="w-4 h-4 text-yellow-600" />
+                <span className="text-sm text-yellow-700">Contact seller for delivery options</span>
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* Description */}
         <div className="mb-8">
           <h3 className={`font-semibold mb-2 ${isPipitV2 ? 'text-[#4A3F37] font-serif text-lg' : 'text-[#4A3F37]'}`}>Description</h3>
@@ -565,8 +741,8 @@ const ListingDetail = () => {
         </div>
 
         {/* Report Link */}
-        <div className="mt-8 text-center pb-8">
-          <button 
+        <div className="mt-8 text-center pb-4">
+          <button
             onClick={handleReport}
             className="text-xs text-[#B8A395] flex items-center justify-center gap-1 mx-auto hover:text-red-500 transition-colors"
           >
@@ -575,6 +751,112 @@ const ListingDetail = () => {
           </button>
         </div>
       </div>
+
+      {/* You Might Like Section */}
+      {similarListings.length > 0 && !isOwnListing && (
+        <div className="mt-6 bg-white rounded-2xl border border-[#E8DDD4] p-5 shadow-sm">
+          <div className="flex items-center gap-2 mb-4">
+            <Sparkles className="w-4 h-4 text-[#E8B44C]" />
+            <h3 className="font-serif font-bold text-[#4A3F37]">You Might Like</h3>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            {similarListings.map((item) => (
+              <ListingCard key={item.id} listing={item} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* More From This Seller Section */}
+      {moreFromSeller.length > 0 && !isOwnListing && (
+        <div className="mt-6 bg-white rounded-2xl border border-[#E8DDD4] p-5 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-full bg-[#F5EDE6] flex items-center justify-center">
+                <ShoppingBag className="w-3 h-3 text-[#6B5D52]" />
+              </div>
+              <h3 className="font-serif font-bold text-[#4A3F37]">More From This Seller</h3>
+            </div>
+            <Link
+              to={`/user/${listing.userId}`}
+              className="text-xs font-medium text-[#2D9B8C] hover:underline flex items-center gap-1"
+            >
+              View all <ChevronRight className="w-3 h-3" />
+            </Link>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            {moreFromSeller.map((item) => (
+              <ListingCard key={item.id} listing={item} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Bundle & Save Section */}
+      {listing.bundleEligible && bundleEligibleItems.length > 0 && !isOwnListing && (
+        <div className="mt-6 bg-gradient-to-br from-purple-50 to-indigo-50 rounded-2xl border border-purple-100 p-5 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-r from-purple-500 to-indigo-600 flex items-center justify-center">
+                <Package className="w-4 h-4 text-white" />
+              </div>
+              <div>
+                <h3 className="font-serif font-bold text-[#4A3F37]">Bundle & Save</h3>
+                <p className="text-xs text-purple-600 font-medium">
+                  Save {listing.bundleDiscount || 10}% when you buy multiple items
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Bundle Savings Calculator */}
+          <div className="bg-white rounded-xl p-4 mb-4 border border-purple-100">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-[#6B5D52]">This item</span>
+              <span className="font-semibold text-[#4A3F37]">${listing.price}</span>
+            </div>
+            <div className="flex items-center justify-between text-sm mt-2">
+              <span className="text-[#6B5D52]">Add another eligible item</span>
+              <span className="text-purple-600 font-semibold">
+                −{listing.bundleDiscount || 10}% off both
+              </span>
+            </div>
+            <div className="border-t border-[#E8DDD4] mt-3 pt-3">
+              <p className="text-xs text-[#9A8578]">
+                Example: Buy this ${listing.price} item + a ${bundleEligibleItems[0]?.price || 50} item =
+                <span className="font-bold text-purple-600 ml-1">
+                  ${Math.round((listing.price + (bundleEligibleItems[0]?.price || 50)) * (1 - (listing.bundleDiscount || 10) / 100))} total
+                </span>
+              </p>
+            </div>
+          </div>
+
+          {/* Other Bundle-Eligible Items */}
+          <p className="text-xs font-medium text-[#6B5D52] mb-3">Add to your bundle:</p>
+          <div className="grid grid-cols-2 gap-3">
+            {bundleEligibleItems.map((item) => (
+              <ListingCard key={item.id} listing={item} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Bundle Badge on current listing if eligible */}
+      {listing.bundleEligible && bundleEligibleItems.length === 0 && !isOwnListing && (
+        <div className="mt-6 bg-gradient-to-br from-purple-50 to-indigo-50 rounded-2xl border border-purple-100 p-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-r from-purple-500 to-indigo-600 flex items-center justify-center flex-shrink-0">
+              <Package className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h4 className="font-semibold text-[#4A3F37] text-sm">Bundle Eligible</h4>
+              <p className="text-xs text-purple-600">
+                Save {listing.bundleDiscount || 10}% when you buy this with other bundle-eligible items from {seller?.name || 'this seller'}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
       </div>
 
       {/* Action Bar - Mobile: inline bottom, Desktop: fixed side panel */}

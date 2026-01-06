@@ -1,7 +1,12 @@
-
 import React, { Component, ErrorInfo, ReactNode, StrictMode } from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+import { initSentry, captureError } from './services/sentry';
+import { initPostHog } from './services/posthog';
+
+// Initialize monitoring services
+initSentry();
+initPostHog();
 
 // Explicit interfaces for ErrorBoundary props and state
 interface ErrorBoundaryProps {
@@ -27,6 +32,11 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error("Uncaught error:", error, errorInfo);
+    // Report to Sentry
+    captureError(error, {
+      componentStack: errorInfo.componentStack,
+      errorBoundary: true,
+    });
   }
 
   render() {

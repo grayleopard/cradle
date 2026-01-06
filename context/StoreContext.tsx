@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
-import { Listing, User, Conversation, Message, Review, Transaction, TransactionStatus, Report, SavedSearch, Offer, OfferStatus, Charity, DonationOption, Notification, NotificationType } from '../types';
+import { Listing, User, Conversation, Message, Review, Transaction, TransactionStatus, Report, SavedSearch, Offer, OfferStatus, Charity, DonationOption, Notification, NotificationType, WishlistItem } from '../types';
 import { MOCK_LISTINGS, MOCK_USERS, DEFAULT_CHARITY } from '../constants';
 import { calculateDistance, ZIP_COORDINATES } from '../utils/locationHelpers';
 import { supabase, getSession, getUserProfile, signOut as supabaseSignOut } from '../services/supabase';
@@ -38,6 +38,13 @@ interface StoreContextType {
   markAsSold: (id: string) => void;
   toggleFavorite: (listingId: string) => void;
 
+  // Wishlist with price alerts
+  addToWishlist: (listingId: string, alertOnPriceDrop?: boolean, alertThreshold?: number) => void;
+  removeFromWishlist: (listingId: string) => void;
+  updateWishlistAlertSettings: (listingId: string, alertOnPriceDrop: boolean, alertThreshold?: number) => void;
+  isInWishlist: (listingId: string) => boolean;
+  getWishlistItem: (listingId: string) => WishlistItem | undefined;
+
   // Users & Community
   getUserById: (id: string) => User | undefined;
   followUser: (targetUserId: string) => void;
@@ -56,6 +63,7 @@ interface StoreContextType {
   // Reviews
   addReview: (review: Review) => void;
   getReviewsByUserId: (userId: string) => Review[];
+  respondToReview: (reviewId: string, response: string) => void;
 
   // Offers
   createOffer: (listingId: string, amount: number, message?: string) => Promise<string>;
@@ -91,16 +99,16 @@ interface StoreContextType {
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
 
 const STORAGE_KEYS = {
-  USER: 'cradle_user',
-  LISTINGS: 'cradle_listings',
-  CONVERSATIONS: 'cradle_conversations',
-  MESSAGES: 'cradle_messages',
-  REVIEWS: 'cradle_reviews',
-  TRANSACTIONS: 'cradle_transactions',
-  REPORTS: 'cradle_reports',
-  COMPARE: 'cradle_compare',
-  OFFERS: 'cradle_offers',
-  NOTIFICATIONS: 'cradle_notifications'
+  USER: 'pipit_user',
+  LISTINGS: 'pipit_listings',
+  CONVERSATIONS: 'pipit_conversations',
+  MESSAGES: 'pipit_messages',
+  REVIEWS: 'pipit_reviews',
+  TRANSACTIONS: 'pipit_transactions',
+  REPORTS: 'pipit_reports',
+  COMPARE: 'pipit_compare',
+  OFFERS: 'pipit_offers',
+  NOTIFICATIONS: 'pipit_notifications'
 };
 
 // Helper to safely parse JSON from localStorage
@@ -299,7 +307,12 @@ export const StoreProvider = ({ children }: { children?: ReactNode }) => {
           .order('created_at', { ascending: false });
 
         if (listingsData && listingsData.length > 0) {
-          setListings(listingsData.map(mapListingFromDB));
+          // Merge Supabase listings with mock listings
+          // Supabase listings come first, then mock listings that don't conflict
+          const dbListings = listingsData.map(mapListingFromDB);
+          const dbListingIds = new Set(dbListings.map(l => l.id));
+          const mockListingsToKeep = MOCK_LISTINGS.filter(l => !dbListingIds.has(l.id));
+          setListings([...dbListings, ...mockListingsToKeep]);
         }
 
         // Fetch conversations
@@ -727,10 +740,64 @@ export const StoreProvider = ({ children }: { children?: ReactNode }) => {
     let newSavedIds;
     if (savedIds.includes(listingId)) {
       newSavedIds = savedIds.filter(id => id !== listingId);
+      // Also remove from wishlist if present
+      removeFromWishlist(listingId);
     } else {
       newSavedIds = [...savedIds, listingId];
+      // Also add to wishlist with default settings
+      addToWishlist(listingId, true);
     }
     updateUser({ ...currentUser, savedListingIds: newSavedIds });
+  };
+
+  // --- Wishlist with Price Alerts ---
+  const addToWishlist = (listingId: string, alertOnPriceDrop: boolean = true, alertThreshold?: number) => {
+    if (!currentUser) return;
+    const listing = getListingById(listingId);
+    if (!listing) return;
+
+    const wishlist = currentUser.wishlist || [];
+    // Check if already in wishlist
+    if (wishlist.find(w => w.listingId === listingId)) return;
+
+    const newItem: WishlistItem = {
+      listingId,
+      savedAt: new Date().toISOString(),
+      priceWhenSaved: listing.price,
+      alertOnPriceDrop,
+      alertThreshold
+    };
+
+    const newWishlist = [...wishlist, newItem];
+    updateUser({ ...currentUser, wishlist: newWishlist });
+  };
+
+  const removeFromWishlist = (listingId: string) => {
+    if (!currentUser) return;
+    const wishlist = currentUser.wishlist || [];
+    const newWishlist = wishlist.filter(w => w.listingId !== listingId);
+    updateUser({ ...currentUser, wishlist: newWishlist });
+  };
+
+  const updateWishlistAlertSettings = (listingId: string, alertOnPriceDrop: boolean, alertThreshold?: number) => {
+    if (!currentUser) return;
+    const wishlist = currentUser.wishlist || [];
+    const newWishlist = wishlist.map(w =>
+      w.listingId === listingId
+        ? { ...w, alertOnPriceDrop, alertThreshold }
+        : w
+    );
+    updateUser({ ...currentUser, wishlist: newWishlist });
+  };
+
+  const isInWishlist = (listingId: string): boolean => {
+    if (!currentUser) return false;
+    return currentUser.wishlist?.some(w => w.listingId === listingId) || false;
+  };
+
+  const getWishlistItem = (listingId: string): WishlistItem | undefined => {
+    if (!currentUser) return undefined;
+    return currentUser.wishlist?.find(w => w.listingId === listingId);
   };
 
   const saveSearch = (search: SavedSearch) => {
@@ -923,7 +990,15 @@ export const StoreProvider = ({ children }: { children?: ReactNode }) => {
   };
 
   const updateListing = async (updatedListing: Listing) => {
+    // Get old listing to check for price changes
+    const oldListing = listings.find(l => l.id === updatedListing.id);
+
     setListings((prev) => prev.map(l => l.id === updatedListing.id ? updatedListing : l));
+
+    // Check for price drop to notify wishlist users
+    if (oldListing && oldListing.price > updatedListing.price) {
+      checkPriceDrops(updatedListing);
+    }
 
     if (supabase) {
       await supabase.from('listings').update({
@@ -1076,8 +1151,12 @@ export const StoreProvider = ({ children }: { children?: ReactNode }) => {
         target_user_id: review.targetUserId,
         author_id: review.authorId,
         author_name: review.authorName,
+        author_avatar_url: review.authorAvatarUrl,
         rating: review.rating,
-        comment: review.comment
+        comment: review.comment,
+        photo_url: review.photoUrl,
+        transaction_id: review.transactionId,
+        item_title: review.itemTitle
       });
     }
   };
@@ -1086,6 +1165,21 @@ export const StoreProvider = ({ children }: { children?: ReactNode }) => {
     reviews.filter(r => r.targetUserId === userId).sort((a, b) =>
       new Date(b.date).getTime() - new Date(a.date).getTime()
     );
+
+  const respondToReview = async (reviewId: string, response: string) => {
+    setReviews(prev => prev.map(r =>
+      r.id === reviewId
+        ? { ...r, sellerResponse: response, sellerResponseDate: new Date().toISOString().split('T')[0] }
+        : r
+    ));
+
+    if (supabase) {
+      await supabase.from('reviews').update({
+        seller_response: response,
+        seller_response_date: new Date().toISOString().split('T')[0]
+      }).eq('id', reviewId);
+    }
+  };
 
   // --- Offers ---
   const createOffer = async (listingId: string, amount: number, message?: string): Promise<string> => {
@@ -1461,6 +1555,47 @@ export const StoreProvider = ({ children }: { children?: ReactNode }) => {
     }
   };
 
+  // Check for price drops and notify users (called when listings are updated)
+  const checkPriceDrops = (updatedListing: Listing) => {
+    if (!currentUser || !currentUser.wishlist) return;
+
+    const wishlistItem = currentUser.wishlist.find(w => w.listingId === updatedListing.id);
+    if (!wishlistItem || !wishlistItem.alertOnPriceDrop) return;
+
+    // Check if price dropped
+    const priceDrop = wishlistItem.priceWhenSaved - updatedListing.price;
+    if (priceDrop <= 0) return;
+
+    // Check threshold if set
+    if (wishlistItem.alertThreshold && updatedListing.price > wishlistItem.alertThreshold) return;
+
+    // Don't notify again within 24 hours
+    if (wishlistItem.notifiedAt) {
+      const lastNotified = new Date(wishlistItem.notifiedAt);
+      const hoursSince = (Date.now() - lastNotified.getTime()) / (1000 * 60 * 60);
+      if (hoursSince < 24) return;
+    }
+
+    // Send notification
+    const dropPercent = Math.round((priceDrop / wishlistItem.priceWhenSaved) * 100);
+    addNotification({
+      userId: currentUser.id,
+      type: NotificationType.PRICE_DROP,
+      title: 'Price Drop Alert! 🏷️',
+      message: `"${updatedListing.title}" dropped ${dropPercent}% to $${updatedListing.price}`,
+      referenceId: updatedListing.id,
+      referenceType: 'listing'
+    });
+
+    // Update notifiedAt
+    const newWishlist = currentUser.wishlist.map(w =>
+      w.listingId === updatedListing.id
+        ? { ...w, notifiedAt: new Date().toISOString() }
+        : w
+    );
+    updateUser({ ...currentUser, wishlist: newWishlist });
+  };
+
   const resetStore = () => {
     localStorage.clear();
     window.location.reload();
@@ -1472,10 +1607,11 @@ export const StoreProvider = ({ children }: { children?: ReactNode }) => {
       userLocation, locationStatus, isLoading,
       login, logout, updateUser, upgradeToPremium, useReferralCredit,
       addListing, updateListing, getListingById, deleteListing, markAsSold, toggleFavorite,
+      addToWishlist, removeFromWishlist, updateWishlistAlertSettings, isInWishlist, getWishlistItem,
       getUserById, followUser, unfollowUser, reportListing, saveSearch, deleteSavedSearch,
       compareIds, toggleCompare, clearCompare,
       startConversation, sendMessage, markMessagesAsRead, getMessagesByConversationId, getConversationById,
-      addReview, getReviewsByUserId,
+      addReview, getReviewsByUserId, respondToReview,
       createOffer, respondToOffer, acceptCounterOffer, withdrawOffer, getOffersForListing, getOfferById, getPendingOffersForSeller,
       createTransaction, getTransactionById, updateTransactionStatus, getActiveTransactionForListing,
       activeCharity, getActiveCharity, updateUserDonationTotal,

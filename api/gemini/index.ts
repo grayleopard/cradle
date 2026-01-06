@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { GoogleGenAI, Type } from "@google/genai";
 import { createClient } from '@supabase/supabase-js';
+import { checkRateLimit, getClientIP } from './rateLimit';
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
@@ -59,6 +60,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  // Rate limiting - 30 requests per minute per IP (AI calls are expensive)
+  const clientIP = getClientIP(req.headers);
+  const rateLimit = checkRateLimit(`gemini:${clientIP}`, { windowMs: 60000, maxRequests: 30 });
+
+  if (!rateLimit.allowed) {
+    res.setHeader('Retry-After', String(rateLimit.resetIn));
+    return res.status(429).json({
+      error: 'Too many requests',
+      message: `Rate limit exceeded. Please try again in ${rateLimit.resetIn} seconds.`
+    });
+  }
+
   const { action, ...params } = req.body;
 
   try {
@@ -100,6 +113,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         break;
       case 'extractMeetingDetails':
         result = await extractMeetingDetails(params);
+        break;
+      case 'validateImages':
+        result = await validateImages(params);
+        break;
+      case 'getPricingSuggestion':
+        result = await getPricingSuggestion(params);
         break;
       default:
         return res.status(400).json({ error: `Unknown action: ${action}` });
@@ -763,4 +782,219 @@ async function extractMeetingDetails({ messages }: { messages: any[] }) {
   const text = response.text;
   if (!text) return null;
   return JSON.parse(text);
+}
+
+async function validateImages({ images, category }: { images: { base64: string; mimeType: string }[]; category?: string }) {
+  const model = "gemini-2.0-flash";
+
+  // Validate each image
+  const results = await Promise.all(images.map(async (img, index) => {
+    const textPrompt = `
+      You are a quality control expert for a baby gear marketplace.
+
+      Analyze this image for a product listing and score it on:
+
+      1. QUALITY (0-100):
+         - Is the image clear and well-lit? (not blurry, not too dark)
+         - Is the item properly centered and visible?
+         - Is the resolution acceptable? (not pixelated)
+         - Deduct heavily for: screenshots of other apps, watermarked images, collages
+
+      2. RELEVANCE (0-100):
+         - Does this appear to be baby/kids gear or related items?
+         - Is this an actual product photo (not a meme, stock photo, or unrelated image)?
+         - Would a parent find this useful for evaluating the item?
+         ${category ? `- Expected category: ${category}` : ''}
+
+      3. ISSUES: List any problems found (max 3).
+         Examples: "Image is too dark", "Item not centered", "Appears to be a screenshot"
+
+      4. SUGGESTIONS: Helpful tips to improve (max 2).
+         Examples: "Take photo in natural light", "Move closer to the item"
+
+      Return JSON only.
+    `;
+
+    try {
+      const response = await ai.models.generateContent({
+        model,
+        contents: {
+          parts: [
+            { inlineData: { data: img.base64, mimeType: img.mimeType } },
+            { text: textPrompt }
+          ]
+        },
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              qualityScore: { type: Type.NUMBER },
+              relevanceScore: { type: Type.NUMBER },
+              issues: { type: Type.ARRAY, items: { type: Type.STRING } },
+              suggestions: { type: Type.ARRAY, items: { type: Type.STRING } },
+              itemDescription: { type: Type.STRING }
+            },
+            required: ["qualityScore", "relevanceScore", "issues"]
+          }
+        }
+      });
+
+      const text = response.text;
+      if (!text) throw new Error("No response from AI");
+
+      const result = JSON.parse(text);
+
+      // Determine status based on scores
+      let status: 'approved' | 'warning' | 'rejected' = 'approved';
+      let rejectionReason: string | undefined;
+
+      // Thresholds
+      const MIN_QUALITY = 40;
+      const MIN_RELEVANCE = 50;
+      const WARNING_QUALITY = 60;
+
+      if (result.qualityScore < MIN_QUALITY) {
+        status = 'rejected';
+        rejectionReason = 'Image quality is too low. Please take a clearer photo.';
+      } else if (result.relevanceScore < MIN_RELEVANCE) {
+        status = 'rejected';
+        rejectionReason = 'This image doesn\'t appear to show baby or kids gear.';
+      } else if (result.qualityScore < WARNING_QUALITY) {
+        status = 'warning';
+      }
+
+      return {
+        index,
+        status,
+        qualityScore: result.qualityScore,
+        relevanceScore: result.relevanceScore,
+        issues: result.issues || [],
+        suggestions: result.suggestions || [],
+        rejectionReason,
+        itemDescription: result.itemDescription
+      };
+    } catch (error: any) {
+      console.error(`Image ${index} validation failed:`, error);
+      // On error, allow the image but flag for manual review
+      return {
+        index,
+        status: 'warning' as const,
+        qualityScore: 50,
+        relevanceScore: 50,
+        issues: ['Automated check unavailable'],
+        suggestions: [],
+        rejectionReason: undefined
+      };
+    }
+  }));
+
+  // Calculate overall status
+  const hasRejected = results.some(r => r.status === 'rejected');
+  const hasWarning = results.some(r => r.status === 'warning');
+
+  return {
+    overallStatus: hasRejected ? 'rejected' : hasWarning ? 'warning' : 'approved',
+    results,
+    message: hasRejected
+      ? 'One or more images need to be replaced before listing.'
+      : hasWarning
+        ? 'Your images could be improved, but you can proceed.'
+        : 'All images look great!'
+  };
+}
+
+async function getPricingSuggestion({
+  title,
+  brand,
+  category,
+  condition,
+  originalRetailPrice,
+  similarListings
+}: {
+  title: string;
+  brand?: string;
+  category: string;
+  condition: string;
+  originalRetailPrice?: number;
+  similarListings?: { title: string; price: number; condition: string }[];
+}) {
+  const model = "gemini-2.0-flash";
+
+  // Build context about similar listings if provided
+  const similarContext = similarListings && similarListings.length > 0
+    ? `\nSimilar items on the marketplace:\n${similarListings.map(l => `- "${l.title}" ($${l.price}, ${l.condition})`).join('\n')}`
+    : '';
+
+  const textPrompt = `
+    You are a pricing expert for a baby gear resale marketplace (like OfferUp/Facebook Marketplace but for baby items).
+
+    Help the seller price their item optimally.
+
+    Item Details:
+    - Title: "${title}"
+    ${brand ? `- Brand: ${brand}` : ''}
+    - Category: ${category}
+    - Condition: ${condition}
+    ${originalRetailPrice ? `- Original Retail Price: $${originalRetailPrice}` : ''}
+    ${similarContext}
+
+    Your Task:
+    1. Estimate a fair SUGGESTED PRICE that balances seller profit with quick sale potential.
+    2. Provide a PRICE RANGE (min/max) for this item in this condition.
+    3. Provide a QUICK SALE PRICE (lower end, for fast sale within 1-2 days).
+    4. Provide a COMPETITIVE PRICE (mid-range, should sell within a week).
+    5. Write a brief REASONING (why this price is appropriate).
+    6. List 2-3 MARKET INSIGHTS (tips about pricing this type of item).
+
+    Pricing Guidelines by Condition:
+    - "Like New": 50-70% of retail
+    - "Excellent": 40-55% of retail
+    - "Very Good": 30-45% of retail
+    - "Good": 20-35% of retail
+    - "Fair": 15-25% of retail
+
+    Popular brands (UPPAbaby, Bugaboo, Nuna, Stokke) command premium resale prices.
+    Budget brands (Graco, Evenflo, Cosco) have lower resale value.
+
+    Return JSON only.
+  `;
+
+  const response = await ai.models.generateContent({
+    model,
+    contents: textPrompt,
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          suggestedPrice: { type: Type.NUMBER },
+          priceRange: {
+            type: Type.OBJECT,
+            properties: {
+              min: { type: Type.NUMBER },
+              max: { type: Type.NUMBER }
+            }
+          },
+          quickSalePrice: { type: Type.NUMBER },
+          competitivePrice: { type: Type.NUMBER },
+          reasoning: { type: Type.STRING },
+          marketInsights: { type: Type.ARRAY, items: { type: Type.STRING } }
+        },
+        required: ["suggestedPrice", "priceRange", "quickSalePrice", "competitivePrice", "reasoning", "marketInsights"]
+      }
+    }
+  });
+
+  const text = response.text;
+  if (!text) throw new Error("No response from AI");
+
+  const result = JSON.parse(text);
+
+  // Include similar listings in response if we had them
+  if (similarListings && similarListings.length > 0) {
+    result.similarListings = similarListings;
+  }
+
+  return result;
 }

@@ -83,9 +83,7 @@ const Notifications: React.FC = () => {
         {notifications.length === 0 ? (
           /* Empty State */
           <div className="py-20 px-4 text-center">
-            <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-[#F5EDE6] flex items-center justify-center">
-              <Bell className="w-10 h-10 text-[#B8A395]" />
-            </div>
+            <div className="text-5xl mb-4">🔔</div>
             <h2 className="font-serif text-xl font-semibold text-[#4A3F37] mb-2">
               No notifications yet
             </h2>

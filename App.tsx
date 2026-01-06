@@ -24,6 +24,17 @@ import DevSettings from './pages/DevSettings';
 import Compare from './pages/Compare';
 import DesignPreview from './pages/DesignPreview';
 import Notifications from './pages/Notifications';
+import TrustSettingsPage from './pages/TrustSettingsPage';
+import TermsOfService from './pages/TermsOfService';
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import AuthCallback from './pages/AuthCallback';
+import ResetPassword from './pages/ResetPassword';
+import AccountSettings from './pages/AccountSettings';
+import SellerAnalytics from './pages/SellerAnalytics';
+import InventoryManagement from './pages/InventoryManagement';
+import BulkListing from './pages/BulkListing';
+import Wishlist from './pages/Wishlist';
+import AvailabilitySettings from './pages/AvailabilitySettings';
 
 // Wrapper for routes that require authentication
 const ProtectedRoute = ({ children }: { children?: React.ReactNode }) => {
@@ -58,6 +69,13 @@ const AppRoutes = () => {
       <Route path="/profile/verify" element={<ProtectedRoute><ParentVerification /></ProtectedRoute>} />
       <Route path="/profile/safety-check" element={<ProtectedRoute><SafetyCheck /></ProtectedRoute>} />
       <Route path="/profile/premium" element={<ProtectedRoute><Premium /></ProtectedRoute>} />
+      <Route path="/profile/trust" element={<ProtectedRoute><TrustSettingsPage /></ProtectedRoute>} />
+      <Route path="/profile/account" element={<ProtectedRoute><AccountSettings /></ProtectedRoute>} />
+      <Route path="/profile/analytics" element={<ProtectedRoute><SellerAnalytics /></ProtectedRoute>} />
+      <Route path="/profile/inventory" element={<ProtectedRoute><InventoryManagement /></ProtectedRoute>} />
+      <Route path="/profile/wishlist" element={<ProtectedRoute><Wishlist /></ProtectedRoute>} />
+      <Route path="/profile/availability" element={<ProtectedRoute><AvailabilitySettings /></ProtectedRoute>} />
+      <Route path="/sell/bulk" element={<ProtectedRoute><BulkListing /></ProtectedRoute>} />
       <Route path="/messages" element={<ProtectedRoute><Inbox /></ProtectedRoute>} />
       <Route path="/chat/:id" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
       <Route path="/transaction/:id" element={<ProtectedRoute><Transaction /></ProtectedRoute>} />
@@ -68,6 +86,12 @@ const AppRoutes = () => {
 
       {/* Design Preview - standalone, no layout */}
       <Route path="/design" element={<DesignPreview />} />
+      <Route path="/terms" element={<TermsOfService />} />
+      <Route path="/privacy" element={<PrivacyPolicy />} />
+
+      {/* Auth routes - standalone, no layout */}
+      <Route path="/auth/callback" element={<AuthCallback />} />
+      <Route path="/auth/reset-password" element={<ResetPassword />} />
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

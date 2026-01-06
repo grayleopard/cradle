@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
+import { checkRateLimit, getClientIP } from './utils/rateLimit';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
   apiVersion: '2025-12-15.clover',
@@ -63,6 +64,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  // Rate limiting - 20 requests per minute per IP
+  const clientIP = getClientIP(req.headers);
+  const rateLimit = checkRateLimit(`stripe:${clientIP}`, { windowMs: 60000, maxRequests: 20 });
+
+  if (!rateLimit.allowed) {
+    res.setHeader('Retry-After', String(rateLimit.resetIn));
+    return res.status(429).json({
+      error: 'Too many requests',
+      message: `Rate limit exceeded. Please try again in ${rateLimit.resetIn} seconds.`
+    });
+  }
+
   const { action, ...params } = req.body;
 
   // Validate action exists
@@ -109,7 +122,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           country: 'US',
           email,
           business_type: 'individual', // Pre-set for peer-to-peer sellers
-          metadata: { cradle_user_id: userId },
+          metadata: { pipit_user_id: userId },
           capabilities: {
             card_payments: { requested: true },
             transfers: { requested: true },
@@ -413,6 +426,84 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           transferId: transfer.id,
           amount: sellerAmount / 100, // Convert back to dollars
           status: 'transferred',
+        });
+      }
+
+      // ============================================
+      // CREATE IDENTITY VERIFICATION SESSION
+      // ============================================
+      case 'createIdentitySession': {
+        const { userId, returnUrl } = params;
+
+        // Input validation
+        if (!userId || typeof userId !== 'string') {
+          return res.status(400).json({ error: 'Missing userId' });
+        }
+        if (!returnUrl || typeof returnUrl !== 'string') {
+          return res.status(400).json({ error: 'Missing returnUrl' });
+        }
+
+        // Validate returnUrl is from allowed origin
+        try {
+          const url = new URL(returnUrl);
+          const isAllowedOrigin = ALLOWED_ORIGINS.some(origin => {
+            try {
+              return new URL(origin).host === url.host;
+            } catch { return false; }
+          });
+          if (!isAllowedOrigin && !returnUrl.startsWith('http://localhost')) {
+            return res.status(400).json({ error: 'Invalid return URL origin' });
+          }
+        } catch {
+          return res.status(400).json({ error: 'Invalid return URL format' });
+        }
+
+        // Create Stripe Identity Verification Session
+        const verificationSession = await stripe.identity.verificationSessions.create({
+          type: 'document',
+          metadata: {
+            pipit_user_id: userId,
+          },
+          options: {
+            document: {
+              // Accept driver's license, passport, or ID card
+              allowed_types: ['driving_license', 'passport', 'id_card'],
+              require_matching_selfie: true, // Require selfie to match document
+            },
+          },
+          return_url: `${returnUrl}?verification=complete`,
+        });
+
+        return res.json({
+          sessionId: verificationSession.id,
+          clientSecret: verificationSession.client_secret,
+          url: verificationSession.url, // Redirect URL for hosted verification
+          status: verificationSession.status,
+        });
+      }
+
+      // ============================================
+      // GET IDENTITY VERIFICATION STATUS
+      // ============================================
+      case 'getIdentityStatus': {
+        const { sessionId } = params;
+
+        // Input validation
+        if (!sessionId || typeof sessionId !== 'string') {
+          return res.status(400).json({ error: 'Missing sessionId' });
+        }
+
+        // Validate session ID format (starts with vs_)
+        if (!sessionId.startsWith('vs_')) {
+          return res.status(400).json({ error: 'Invalid session ID format' });
+        }
+
+        const session = await stripe.identity.verificationSessions.retrieve(sessionId);
+
+        return res.json({
+          status: session.status, // 'requires_input', 'processing', 'verified', 'canceled'
+          verified: session.status === 'verified',
+          lastError: session.last_error?.reason,
         });
       }
 

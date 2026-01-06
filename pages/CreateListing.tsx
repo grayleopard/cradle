@@ -1,14 +1,16 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { checkProductSafety, generateListingMetadata, optimizeListingDescription, analyzeDeal } from '../services/geminiService';
-import { uploadToCloudinary } from '../services/cloudinaryService';
+import { checkProductSafety, generateListingMetadata, optimizeListingDescription, analyzeDeal, validateListingImages, ImageValidationResponse } from '../services/geminiService';
+import { uploadToCloudinary, validateBeforeUpload } from '../services/cloudinaryService';
 import { useStore } from '../context/StoreContext';
 import { useToast } from '../context/ToastContext';
-import { Condition, Category, AgeRange, Listing, SafetyCheckResult, DealAnalysis } from '../types';
+import { Condition, Category, AgeRange, Listing, SafetyCheckResult, DealAnalysis, DeliveryMethod, SHIPPING_ESTIMATES } from '../types';
 import { processImage } from '../utils/fileHelpers';
 import { generateUUID } from '../utils/uuid';
-import { Loader2, CheckCircle2, AlertTriangle, Camera, X, ChevronLeft, Calendar, Sparkles, Wand2, DollarSign } from 'lucide-react';
+import { Loader2, CheckCircle2, AlertTriangle, Camera, X, ChevronLeft, Calendar, Sparkles, Wand2, DollarSign, Package, Truck, MapPin } from 'lucide-react';
+import ImageValidationFeedback from '../components/ImageValidationFeedback';
+import PricingSuggestionWidget from '../components/PricingSuggestion';
 
 interface ImageState {
   id: string;
@@ -30,6 +32,10 @@ interface FormState {
   isSmokeFree: boolean;
   isPetFree: boolean;
   dealAnalysis?: DealAnalysis; // Store result from creation flow
+  bundleEligible: boolean;
+  bundleDiscount: number;
+  deliveryMethod: DeliveryMethod;
+  shippingPrice: string;
 }
 
 const CreateListing = () => {
@@ -49,6 +55,10 @@ const CreateListing = () => {
   const [optimizingDesc, setOptimizingDesc] = useState(false);
   const [checkingPrice, setCheckingPrice] = useState(false);
 
+  // Image Validation States
+  const [imageValidation, setImageValidation] = useState<ImageValidationResponse | null>(null);
+  const [isValidatingImages, setIsValidatingImages] = useState(false);
+
   const [formData, setFormData] = useState<FormState>({
     title: '',
     description: '',
@@ -58,7 +68,11 @@ const CreateListing = () => {
     condition: Condition.GOOD,
     ageRange: AgeRange.ZERO_TO_SIX_MO,
     isSmokeFree: false,
-    isPetFree: false
+    isPetFree: false,
+    bundleEligible: false,
+    bundleDiscount: 10,
+    deliveryMethod: DeliveryMethod.LOCAL_PICKUP,
+    shippingPrice: ''
   });
   
   const [safetyResult, setSafetyResult] = useState<{
@@ -80,7 +94,11 @@ const CreateListing = () => {
           ageRange: listing.ageRange,
           isSmokeFree: listing.isSmokeFree || false,
           isPetFree: listing.isPetFree || false,
-          dealAnalysis: listing.dealAnalysis
+          dealAnalysis: listing.dealAnalysis,
+          bundleEligible: listing.bundleEligible || false,
+          bundleDiscount: listing.bundleDiscount || 10,
+          deliveryMethod: listing.deliveryMethod || DeliveryMethod.LOCAL_PICKUP,
+          shippingPrice: listing.shippingPrice?.toString() || ''
         });
         setManufactureDate(listing.manufactureDate || '');
         // Map existing images to "done" state
@@ -103,27 +121,53 @@ const CreateListing = () => {
       const filesToProcess = Array.from(e.target.files).slice(0, remainingSlots) as File[];
       if (filesToProcess.length === 0) return;
 
-      // 1. Create placeholders
-      const newPlaceholders: ImageState[] = filesToProcess.map(() => ({
+      // Reset validation when new images are added
+      setImageValidation(null);
+
+      // Pre-upload validation for each file
+      const validFiles: File[] = [];
+      for (const file of filesToProcess) {
+        const preValidation = await validateBeforeUpload(file);
+        if (!preValidation.isValid) {
+          showToast(preValidation.error || 'Invalid image', 'error');
+          continue;
+        }
+        if (preValidation.warning) {
+          showToast(preValidation.warning, 'info');
+        }
+        validFiles.push(file);
+      }
+
+      if (validFiles.length === 0) return;
+
+      // 1. Create placeholders for valid files only
+      const newPlaceholders: ImageState[] = validFiles.map(() => ({
         id: Math.random().toString(36).substr(2, 9),
-        previewUrl: '', 
+        previewUrl: '',
         status: 'uploading'
       }));
-      
+
       setImages(prev => [...prev, ...newPlaceholders]);
       if (safetyResult.status === 'safe') setSafetyResult({ status: 'idle' });
 
+      // Track completed uploads for AI validation
+      let completedUploads = 0;
+      const processedImages: { base64: string; mimeType: string }[] = [];
+
       // 2. Process and Upload
-      filesToProcess.forEach(async (file, index) => {
+      validFiles.forEach(async (file, index) => {
         try {
           // Process locally (resize/compress)
           const processed = await processImage(file);
           const placeholderId = newPlaceholders[index].id;
 
+          // Store for AI validation
+          processedImages[index] = { base64: processed.base64, mimeType: processed.mimeType };
+
           // Update preview immediately
-          setImages(prev => prev.map(img => 
-            img.id === placeholderId 
-              ? { ...img, previewUrl: processed.previewUrl, base64: processed.base64, mimeType: processed.mimeType } 
+          setImages(prev => prev.map(img =>
+            img.id === placeholderId
+              ? { ...img, previewUrl: processed.previewUrl, base64: processed.base64, mimeType: processed.mimeType }
               : img
           ));
 
@@ -131,26 +175,56 @@ const CreateListing = () => {
           const remoteUrl = await uploadToCloudinary(processed.blob);
 
           // Update with remote URL and status done
-          setImages(prev => prev.map(img => 
-            img.id === placeholderId 
-              ? { ...img, remoteUrl, status: 'done' } 
+          setImages(prev => prev.map(img =>
+            img.id === placeholderId
+              ? { ...img, remoteUrl, status: 'done' }
               : img
           ));
+
+          // Track completion
+          completedUploads++;
+
+          // Run AI validation when all uploads complete
+          if (completedUploads === validFiles.length) {
+            runImageValidation(processedImages);
+          }
 
         } catch (err) {
           console.error(err);
           showToast("Failed to upload image", "error");
           // Remove failed image
           setImages(prev => prev.filter(img => img.id !== newPlaceholders[index].id));
+          completedUploads++; // Still count as complete to not block validation
         }
       });
     }
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
+  // Run AI validation on images
+  const runImageValidation = async (imagesToValidate: { base64: string; mimeType: string }[]) => {
+    if (imagesToValidate.length === 0) return;
+
+    setIsValidatingImages(true);
+    try {
+      const result = await validateListingImages(imagesToValidate, formData.category);
+      setImageValidation(result);
+
+      // Show toast for rejected images
+      if (result?.overallStatus === 'rejected') {
+        showToast('Some photos need to be replaced', 'error');
+      }
+    } catch (error) {
+      console.error('Image validation failed:', error);
+    } finally {
+      setIsValidatingImages(false);
+    }
+  };
+
   const removeImage = (id: string) => {
     setImages(prev => prev.filter(img => img.id !== id));
     setSafetyResult({ status: 'idle' });
+    setImageValidation(null); // Reset validation when image is removed
   };
 
   const handleAutofill = async () => {
@@ -292,6 +366,8 @@ const CreateListing = () => {
       finalImageUrls.push('https://via.placeholder.com/400?text=No+Image');
     }
 
+    const offersShipping = formData.deliveryMethod === DeliveryMethod.SHIPPING || formData.deliveryMethod === DeliveryMethod.BOTH;
+
     const commonData = {
       userId: currentUser.id,
       title: formData.title,
@@ -308,7 +384,12 @@ const CreateListing = () => {
       locationZip: currentUser.location || '98001',
       isSafetyVerified: safetyResult.status === 'safe',
       safetyCheckResult: safetyResult.data,
-      manufactureDate: manufactureDate || undefined
+      manufactureDate: manufactureDate || undefined,
+      bundleEligible: formData.bundleEligible,
+      bundleDiscount: formData.bundleEligible ? formData.bundleDiscount : undefined,
+      deliveryMethod: formData.deliveryMethod,
+      shippingPrice: offersShipping && formData.shippingPrice ? Number(formData.shippingPrice) : undefined,
+      offersShipping
     };
 
     if (id) {
@@ -381,6 +462,13 @@ const CreateListing = () => {
             )}
             
             <p className="text-[10px] text-gray-400">Photos are automatically optimized for mobile.</p>
+
+            {/* Image Validation Feedback */}
+            <ImageValidationFeedback
+              validation={imageValidation}
+              isValidating={isValidatingImages}
+              onDismiss={() => setImageValidation(null)}
+            />
           </div>
 
           <div className="space-y-4">
@@ -448,15 +536,63 @@ const CreateListing = () => {
              <h3 className="text-sm font-semibold text-[#4A3F37] mb-2">Safety Verification Required</h3>
              <p className="text-xs text-[#2D9B8C] mb-4">We use a smart check to analyze your photos against the CPSC recall database.</p>
              {safetyResult.status === 'idle' && (
-               <button onClick={handleSafetyCheck} disabled={!formData.title || !formData.description || images.length === 0} className="w-full py-3 bg-[#2D9B8C] text-white rounded-xl font-medium disabled:opacity-50 flex items-center justify-center gap-2">Verify Safety</button>
+               <button
+                 onClick={handleSafetyCheck}
+                 disabled={!formData.title || !formData.description || images.length === 0 || imageValidation?.overallStatus === 'rejected' || isValidatingImages}
+                 className="w-full py-3 bg-[#2D9B8C] text-white rounded-xl font-medium disabled:opacity-50 flex items-center justify-center gap-2"
+               >
+                 {imageValidation?.overallStatus === 'rejected' ? 'Fix Photos First' : 'Verify Safety'}
+               </button>
              )}
              {safetyResult.status === 'checking' && <div className="w-full py-3 bg-[#F0FAF8] text-[#247A6F] rounded-xl font-medium flex items-center justify-center gap-2"><Loader2 className="w-5 h-5 animate-spin" /> Analyzing Item...</div>}
              {safetyResult.status === 'safe' && <button type="button" onClick={() => setStep(2)} className="w-full py-3 bg-green-100 text-green-700 rounded-xl font-medium flex items-center justify-center gap-2 hover:bg-green-200"><CheckCircle2 className="w-5 h-5" /> Verified Safe - Continue</button>}
              {safetyResult.status === 'warning' && (
                 <div className="space-y-3">
-                   <div className="w-full py-3 bg-red-100 text-red-700 rounded-xl font-medium flex items-center justify-center gap-2"><AlertTriangle className="w-5 h-5" /> Safety Issue Detected</div>
-                   <p className="text-xs text-red-600 bg-white p-2 rounded border border-red-100">{safetyResult.data?.reason || "Check failed."}</p>
-                   <button type="button" onClick={() => setStep(2)} className="text-xs text-gray-500 underline w-full text-center">Continue anyway (Flag for review)</button>
+                   {/* Check if there are actual recalls - these BLOCK listing */}
+                   {safetyResult.data?.potentialRecalls && safetyResult.data.potentialRecalls.length > 0 ? (
+                     <>
+                       <div className="w-full py-3 bg-red-600 text-white rounded-xl font-medium flex items-center justify-center gap-2">
+                         <AlertTriangle className="w-5 h-5" /> 🚫 Recalled Item - Cannot List
+                       </div>
+                       <div className="bg-red-50 p-3 rounded-lg border border-red-200">
+                         <p className="text-sm text-red-800 font-medium mb-2">This item has been recalled:</p>
+                         <ul className="text-xs text-red-700 list-disc pl-4 space-y-1">
+                           {safetyResult.data.potentialRecalls.map((recall, idx) => (
+                             <li key={idx}>{recall}</li>
+                           ))}
+                         </ul>
+                       </div>
+                       <p className="text-xs text-red-600 bg-white p-2 rounded border border-red-100">
+                         {safetyResult.data?.reason}
+                       </p>
+                       <p className="text-xs text-gray-500 text-center">
+                         For safety reasons, recalled items cannot be sold on Pipit.
+                         <a href="https://www.cpsc.gov/Recalls" target="_blank" rel="noopener noreferrer" className="text-[#2D9B8C] underline ml-1">
+                           Learn more at CPSC.gov
+                         </a>
+                       </p>
+                       <button
+                         type="button"
+                         onClick={() => navigate('/')}
+                         className="w-full py-3 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200 transition-colors"
+                       >
+                         Return Home
+                       </button>
+                     </>
+                   ) : (
+                     /* Non-recall safety warnings can still proceed with flag */
+                     <>
+                       <div className="w-full py-3 bg-amber-100 text-amber-700 rounded-xl font-medium flex items-center justify-center gap-2">
+                         <AlertTriangle className="w-5 h-5" /> Safety Concern Detected
+                       </div>
+                       <p className="text-xs text-amber-700 bg-white p-2 rounded border border-amber-100">
+                         {safetyResult.data?.reason || "Check failed."}
+                       </p>
+                       <button type="button" onClick={() => setStep(2)} className="text-xs text-gray-500 underline w-full text-center">
+                         Continue anyway (Flag for review)
+                       </button>
+                     </>
+                   )}
                 </div>
              )}
           </div>
@@ -526,6 +662,18 @@ const CreateListing = () => {
             </div>
           </div>
 
+          {/* AI Pricing Suggestion */}
+          {formData.title.length >= 5 && (
+            <PricingSuggestionWidget
+              title={formData.title}
+              category={formData.category}
+              condition={formData.condition}
+              originalPrice={formData.originalPrice ? Number(formData.originalPrice) : undefined}
+              currentPrice={formData.price}
+              onPriceSelect={(price) => setFormData({ ...formData, price: price.toString() })}
+            />
+          )}
+
           {/* Seller Fee Disclosure */}
           {formData.price && Number(formData.price) > 0 && (
             <div className="bg-[#F0FAF8] border border-[#2D9B8C]/20 rounded-xl p-3 text-sm">
@@ -591,6 +739,165 @@ const CreateListing = () => {
               <input type="checkbox" checked={formData.isPetFree} onChange={e => setFormData({...formData, isPetFree: e.target.checked})} className="w-5 h-5 text-[#2D9B8C] rounded" />
               <span className="text-sm text-gray-700">Pet-free home</span>
             </label>
+          </div>
+
+          {/* Delivery Options Section */}
+          <div className="space-y-4 bg-gradient-to-r from-teal-50 to-cyan-50 p-4 rounded-xl border border-teal-100">
+            <div className="flex items-center gap-2">
+              <Truck className="w-5 h-5 text-[#2D9B8C]" />
+              <h4 className="font-medium text-gray-700 text-sm">Delivery Options</h4>
+            </div>
+            <p className="text-xs text-gray-500">Choose how buyers can receive this item.</p>
+
+            <div className="space-y-2">
+              {/* Local Pickup Only */}
+              <label className="flex items-start gap-3 p-3 rounded-lg cursor-pointer transition-all border-2 hover:bg-white/50"
+                style={{
+                  borderColor: formData.deliveryMethod === DeliveryMethod.LOCAL_PICKUP ? '#2D9B8C' : 'transparent',
+                  backgroundColor: formData.deliveryMethod === DeliveryMethod.LOCAL_PICKUP ? 'white' : 'transparent'
+                }}
+              >
+                <input
+                  type="radio"
+                  name="deliveryMethod"
+                  checked={formData.deliveryMethod === DeliveryMethod.LOCAL_PICKUP}
+                  onChange={() => setFormData({...formData, deliveryMethod: DeliveryMethod.LOCAL_PICKUP, shippingPrice: ''})}
+                  className="mt-1 w-4 h-4 text-[#2D9B8C] accent-[#2D9B8C]"
+                />
+                <div>
+                  <div className="flex items-center gap-2">
+                    <MapPin className="w-4 h-4 text-[#2D9B8C]" />
+                    <span className="text-sm font-medium text-gray-700">Local Pickup Only</span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-0.5">Meet buyers in person near your location</p>
+                </div>
+              </label>
+
+              {/* Shipping Only */}
+              <label className="flex items-start gap-3 p-3 rounded-lg cursor-pointer transition-all border-2 hover:bg-white/50"
+                style={{
+                  borderColor: formData.deliveryMethod === DeliveryMethod.SHIPPING ? '#2D9B8C' : 'transparent',
+                  backgroundColor: formData.deliveryMethod === DeliveryMethod.SHIPPING ? 'white' : 'transparent'
+                }}
+              >
+                <input
+                  type="radio"
+                  name="deliveryMethod"
+                  checked={formData.deliveryMethod === DeliveryMethod.SHIPPING}
+                  onChange={() => setFormData({...formData, deliveryMethod: DeliveryMethod.SHIPPING})}
+                  className="mt-1 w-4 h-4 text-[#2D9B8C] accent-[#2D9B8C]"
+                />
+                <div>
+                  <div className="flex items-center gap-2">
+                    <Truck className="w-4 h-4 text-[#2D9B8C]" />
+                    <span className="text-sm font-medium text-gray-700">Ship Nationwide</span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-0.5">Ship to buyers anywhere in the US</p>
+                </div>
+              </label>
+
+              {/* Both Options */}
+              <label className="flex items-start gap-3 p-3 rounded-lg cursor-pointer transition-all border-2 hover:bg-white/50"
+                style={{
+                  borderColor: formData.deliveryMethod === DeliveryMethod.BOTH ? '#2D9B8C' : 'transparent',
+                  backgroundColor: formData.deliveryMethod === DeliveryMethod.BOTH ? 'white' : 'transparent'
+                }}
+              >
+                <input
+                  type="radio"
+                  name="deliveryMethod"
+                  checked={formData.deliveryMethod === DeliveryMethod.BOTH}
+                  onChange={() => setFormData({...formData, deliveryMethod: DeliveryMethod.BOTH})}
+                  className="mt-1 w-4 h-4 text-[#2D9B8C] accent-[#2D9B8C]"
+                />
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-gray-700">Both Options</span>
+                    <span className="text-[10px] bg-[#2D9B8C] text-white px-1.5 py-0.5 rounded-full font-bold">Recommended</span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-0.5">Local pickup or ship - buyer's choice</p>
+                </div>
+              </label>
+            </div>
+
+            {/* Shipping Price Input */}
+            {(formData.deliveryMethod === DeliveryMethod.SHIPPING || formData.deliveryMethod === DeliveryMethod.BOTH) && (
+              <div className="pt-3 border-t border-teal-100 animate-in fade-in">
+                <label className="block text-xs font-medium text-gray-600 mb-2">Shipping Cost</label>
+                <div className="flex items-center gap-3">
+                  <div className="relative flex-1">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">$</span>
+                    <input
+                      type="number"
+                      min="0"
+                      max="200"
+                      value={formData.shippingPrice}
+                      onChange={e => setFormData({...formData, shippingPrice: e.target.value})}
+                      placeholder={SHIPPING_ESTIMATES[formData.category]?.minCost?.toString() || '10'}
+                      className="w-full pl-7 pr-3 py-2.5 bg-white rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#2D9B8C] text-sm"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setFormData({...formData, shippingPrice: '0'})}
+                    className={`px-3 py-2.5 rounded-lg text-xs font-bold transition-all ${
+                      formData.shippingPrice === '0'
+                        ? 'bg-[#2D9B8C] text-white'
+                        : 'bg-white text-[#2D9B8C] border border-[#2D9B8C] hover:bg-[#F0FAF8]'
+                    }`}
+                  >
+                    Free Shipping
+                  </button>
+                </div>
+                <p className="text-[10px] text-gray-400 mt-2">
+                  💡 Estimated shipping for {formData.category}: ${SHIPPING_ESTIMATES[formData.category]?.minCost || 10}-${SHIPPING_ESTIMATES[formData.category]?.maxCost || 30} ({SHIPPING_ESTIMATES[formData.category]?.estimatedDays || '3-7 days'})
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Bundle Deals Section */}
+          <div className="space-y-3 bg-gradient-to-r from-purple-50 to-indigo-50 p-4 rounded-xl border border-purple-100">
+            <div className="flex items-center gap-2">
+              <Package className="w-5 h-5 text-purple-600" />
+              <h4 className="font-medium text-gray-700 text-sm">Bundle Deals</h4>
+            </div>
+            <p className="text-xs text-gray-500">Let buyers save when they purchase multiple items from you.</p>
+
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={formData.bundleEligible}
+                onChange={e => setFormData({...formData, bundleEligible: e.target.checked})}
+                className="w-5 h-5 text-purple-600 rounded accent-purple-600"
+              />
+              <span className="text-sm text-gray-700">Enable bundle discount</span>
+            </label>
+
+            {formData.bundleEligible && (
+              <div className="space-y-2 pt-2 animate-in fade-in">
+                <label className="block text-xs font-medium text-gray-600">Discount when bundled (%)</label>
+                <div className="flex items-center gap-3">
+                  {[5, 10, 15, 20].map((pct) => (
+                    <button
+                      key={pct}
+                      type="button"
+                      onClick={() => setFormData({...formData, bundleDiscount: pct})}
+                      className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                        formData.bundleDiscount === pct
+                          ? 'bg-purple-600 text-white shadow-md'
+                          : 'bg-white text-gray-600 border border-gray-200 hover:border-purple-300'
+                      }`}
+                    >
+                      {pct}%
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[10px] text-gray-400 mt-1">
+                  Buyers will see a "{formData.bundleDiscount}% bundle" badge on this listing.
+                </p>
+              </div>
+            )}
           </div>
 
           <button type="submit" className="w-full py-4 bg-[#2D9B8C] text-white text-lg font-semibold rounded-xl hover:bg-[#247A6F] shadow-lg transition-all transform hover:-translate-y-0.5">

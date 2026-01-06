@@ -205,11 +205,17 @@ VITE_STRIPE_PUBLISHABLE_KEY= # Stripe public key
 VITE_CLOUDINARY_CLOUD_NAME=  # Cloudinary cloud name (default: dgq9mn6uz)
 VITE_CLOUDINARY_UPLOAD_PRESET= # Cloudinary preset (default: cradle_uploads)
 
+# Monitoring & Analytics (VITE_ prefixed)
+VITE_SENTRY_DSN=             # Sentry DSN for error tracking
+VITE_POSTHOG_KEY=            # PostHog project API key
+VITE_POSTHOG_HOST=           # PostHog host (default: https://us.i.posthog.com)
+
 # Server-side only (not VITE_ prefixed - for API routes)
 STRIPE_SECRET_KEY=           # Stripe secret key
 STRIPE_WEBHOOK_SECRET=       # Stripe webhook signing secret (whsec_...)
 GROQ_API_KEY=                # Groq API key for deal analysis
 SUPABASE_SERVICE_ROLE_KEY=   # Supabase service role key (for webhooks)
+RESEND_API_KEY=              # Resend API key for transactional emails
 
 ```
 

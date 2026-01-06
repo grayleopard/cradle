@@ -147,19 +147,29 @@ const Chat = () => {
     messagesEndRef.current?.scrollIntoView({ behavior });
   };
 
+  // Off-platform payment detection
+  const RISK_KEYWORDS = ['venmo', 'cashapp', 'zelle', 'paypal', 'cash app', 'cash only', 'wire transfer', 'western union', 'gift card', 'money order', 'bitcoin', 'crypto', 'phone number', 'call me', 'text me', '@gmail', '@yahoo', '@hotmail', 'whatsapp', 'telegram'];
+  const PHONE_REGEX = /\b\d{3}[-.\s]?\d{3}[-.\s]?\d{4}\b/;
+  const EMAIL_REGEX = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/;
+
+  const checkMessageRisk = (text: string): boolean => {
+    const lower = text.toLowerCase();
+    return RISK_KEYWORDS.some(kw => lower.includes(kw)) || PHONE_REGEX.test(text) || EMAIL_REGEX.test(text);
+  };
+
+  const [inputHasRisk, setInputHasRisk] = useState(false);
+
   useEffect(() => {
     scrollToBottom();
 
-    const riskKeywords = ['venmo', 'cashapp', 'zelle', 'paypal', 'phone number', 'call me', '@gmail', 'yahoo'];
-    const phoneRegex = /\b\d{3}[-.]?\d{3}[-.]?\d{4}\b/;
-
-    const hasRisk = messages.some(m => {
-       const lower = m.text.toLowerCase();
-       return riskKeywords.some(kw => lower.includes(kw)) || phoneRegex.test(m.text);
-    });
-
+    const hasRisk = messages.some(m => checkMessageRisk(m.text));
     setShowRiskWarning(hasRisk);
   }, [messages]);
+
+  // Check input for risky content as user types
+  useEffect(() => {
+    setInputHasRisk(inputText.length > 3 && checkMessageRisk(inputText));
+  }, [inputText]);
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -522,11 +532,23 @@ const Chat = () => {
               {group.messages.map((msg, index) => {
                 const isMe = msg.senderId === currentUser?.id;
                 const status = getMessageStatus(msg, messages.indexOf(msg));
+                const hasRiskyContent = checkMessageRisk(msg.text);
 
                 return (
                   <div key={msg.id} className={`flex flex-col mb-3 ${isMe ? 'items-end' : 'items-start'}`}>
+                    {/* Risky content indicator */}
+                    {hasRiskyContent && (
+                      <div className={`flex items-center gap-1 mb-1 ${isMe ? 'flex-row-reverse' : ''}`}>
+                        <AlertTriangle className="w-3 h-3 text-amber-500" />
+                        <span className="text-[10px] text-amber-600 font-medium">Off-platform contact detected</span>
+                      </div>
+                    )}
                     <div
                       className={`max-w-[75%] px-4 py-3 text-[15px] leading-relaxed ${
+                        hasRiskyContent
+                          ? 'ring-2 ring-amber-400/50 ring-offset-1'
+                          : ''
+                      } ${
                         isMe
                           ? 'bg-[#2D9B8C] text-white rounded-2xl rounded-br-md'
                           : 'bg-[#F5EDE6] text-[#4A3F37] rounded-2xl rounded-bl-md'
@@ -720,6 +742,16 @@ const Chat = () => {
               {reply}
             </button>
           ))}
+        </div>
+      )}
+
+      {/* Real-time Risk Warning (when typing) */}
+      {inputHasRisk && (
+        <div className="mx-3 mb-2 p-2.5 rounded-xl bg-amber-50 border border-amber-200 flex items-center gap-2 animate-in slide-in-from-bottom-2">
+          <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0" />
+          <p className="text-xs text-amber-800">
+            <strong>Heads up!</strong> Sharing payment apps or contact info outside Pipit means your transaction won't be protected.
+          </p>
         </div>
       )}
 

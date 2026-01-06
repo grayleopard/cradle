@@ -125,3 +125,31 @@ export async function transferToSeller(
     transactionId,
   });
 }
+
+// ============================================
+// IDENTITY VERIFICATION (Stripe Identity)
+// ============================================
+
+export interface IdentitySessionResult {
+  sessionId: string;
+  clientSecret: string;
+  url: string;
+  status: string;
+}
+
+export async function createIdentitySession(
+  userId: string,
+  returnUrl: string
+): Promise<IdentitySessionResult> {
+  return callStripeAPI('createIdentitySession', { userId, returnUrl });
+}
+
+export interface IdentityStatusResult {
+  status: 'requires_input' | 'processing' | 'verified' | 'canceled';
+  verified: boolean;
+  lastError?: string;
+}
+
+export async function getIdentityStatus(sessionId: string): Promise<IdentityStatusResult> {
+  return callStripeAPI('getIdentityStatus', { sessionId });
+}

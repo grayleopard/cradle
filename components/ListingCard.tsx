@@ -1,17 +1,19 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Heart, Shield, MapPin } from 'lucide-react';
+import { Heart, Shield, MapPin, Package, Truck } from 'lucide-react';
 import ImageWithSkeleton from './ImageWithSkeleton';
-import { Listing } from '../types';
+import { Listing, TrustTier } from '../types';
 import { useStore } from '../context/StoreContext';
+import { TrustListingBadge } from './TrustBadge';
 
 interface ListingCardProps {
   listing: Listing;
 }
 
 const ListingCard: React.FC<ListingCardProps> = ({ listing }) => {
-  const { toggleFavorite, currentUser } = useStore();
+  const { toggleFavorite, currentUser, getUserById } = useStore();
   const isFavorite = currentUser?.savedListingIds?.includes(listing.id);
+  const seller = getUserById(listing.userId);
 
   // Calculate discount if original price exists
   const discountPercent = listing.originalPrice
@@ -67,6 +69,14 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing }) => {
             </div>
           )}
 
+          {/* Bundle Badge - Top Left (below safety or alone) */}
+          {listing.bundleEligible && !listing.isSold && !listing.isSafetyVerified && (
+            <div className="absolute top-3 left-3 px-2 py-1 bg-gradient-to-r from-purple-500 to-indigo-600 rounded-full text-white text-[10px] font-bold flex items-center gap-1 shadow-md">
+              <Package className="w-3 h-3" />
+              {listing.bundleDiscount || 10}% bundle
+            </div>
+          )}
+
           {/* SOLD Badge - Top Left */}
           {listing.isSold && (
             <div
@@ -99,6 +109,18 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing }) => {
             {listing.title}
           </h3>
 
+          {/* Seller with Trust Badge */}
+          {seller && (
+            <div className="mt-1">
+              <TrustListingBadge
+                tier={seller.trustTier || TrustTier.BASIC}
+                sellerName={seller.name}
+                rating={seller.averageRating}
+                reviewCount={seller.reviewCount}
+              />
+            </div>
+          )}
+
           {/* Original Price & Discount - or spacer for consistent height */}
           <div className="h-5 mt-1">
             {listing.originalPrice && discountPercent > 0 && (
@@ -113,8 +135,8 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing }) => {
             )}
           </div>
 
-          {/* Condition & Distance - pushed to bottom */}
-          <div className="flex items-center gap-2 mt-auto text-sm" style={{ color: '#9A8578' }}>
+          {/* Condition, Distance & Shipping - pushed to bottom */}
+          <div className="flex items-center gap-2 mt-auto text-sm flex-wrap" style={{ color: '#9A8578' }}>
             <span
               className="px-2 py-0.5 rounded text-xs"
               style={{ backgroundColor: '#FFF4D9', color: '#B45309' }}
@@ -126,6 +148,18 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing }) => {
               <MapPin className="w-3 h-3" />
               {listing.distanceMiles} mi
             </span>
+            {listing.offersShipping && (
+              <>
+                <span>·</span>
+                <span
+                  className="flex items-center gap-0.5 text-xs font-medium"
+                  style={{ color: listing.shippingPrice === 0 ? '#10B981' : '#2D9B8C' }}
+                >
+                  <Truck className="w-3 h-3" />
+                  {listing.shippingPrice === 0 ? 'Free Ship' : 'Ships'}
+                </span>
+              </>
+            )}
           </div>
         </div>
       </div>

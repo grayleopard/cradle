@@ -2,7 +2,7 @@
 import React from 'react';
 import { useStore } from '../context/StoreContext';
 import { Link } from 'react-router-dom';
-import { MessageCircle, Calendar, ChevronRight, Sparkles } from 'lucide-react';
+import { Calendar, ChevronRight } from 'lucide-react';
 import { TransactionStatus } from '../types';
 
 const Inbox = () => {
@@ -22,14 +22,7 @@ const Inbox = () => {
 
         {/* Empty State */}
         <div className="flex flex-col items-center justify-center px-6 py-20 text-center">
-          <div className="relative mb-6">
-            <div className="w-24 h-24 bg-[#F5EDE6] rounded-full flex items-center justify-center">
-              <MessageCircle className="w-12 h-12 text-[#2D9B8C]" />
-            </div>
-            <div className="absolute -bottom-1 -right-1 bg-[#2D9B8C] rounded-full p-2">
-              <Sparkles className="w-4 h-4 text-white" />
-            </div>
-          </div>
+          <div className="text-5xl mb-6">💬</div>
 
           <h2 className="text-xl font-bold font-serif text-[#4A3F37] mb-2">No Messages Yet</h2>
           <p className="text-[#6B5D52] text-sm max-w-xs leading-relaxed mb-8">
@@ -44,7 +37,7 @@ const Inbox = () => {
           </Link>
 
           <p className="text-xs text-[#9CA3AF] mt-6 max-w-xs">
-            Tip: Tap "Message Seller" on any listing to start a conversation
+            💡 Tap "Message Seller" on any listing to start a conversation
           </p>
         </div>
       </div>

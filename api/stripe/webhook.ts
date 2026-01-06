@@ -133,7 +133,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // ============================================
       case 'account.updated': {
         const account = event.data.object as Stripe.Account;
-        const userId = account.metadata?.cradle_user_id;
+        const userId = account.metadata?.pipit_user_id;
 
         console.log(`[Webhook] Connect account updated: ${account.id}, user: ${userId}`);
 

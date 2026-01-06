@@ -262,6 +262,82 @@ export const extractMeetingDetails = async (
   }
 };
 
+// Pricing Suggestion Types and Function
+export interface PricingSuggestion {
+  suggestedPrice: number;
+  priceRange: { min: number; max: number };
+  quickSalePrice: number;
+  competitivePrice: number;
+  reasoning: string;
+  marketInsights: string[];
+  similarListings?: { title: string; price: number; condition: string }[];
+}
+
+export const getPricingSuggestion = async (
+  title: string,
+  brand: string | undefined,
+  category: string,
+  condition: string,
+  originalRetailPrice?: number,
+  similarListings?: { title: string; price: number; condition: string }[]
+): Promise<PricingSuggestion | null> => {
+  try {
+    return await callGeminiAPI<PricingSuggestion>('getPricingSuggestion', {
+      title,
+      brand,
+      category,
+      condition,
+      originalRetailPrice,
+      similarListings
+    });
+  } catch (error) {
+    console.error("Pricing suggestion failed:", error);
+    return null;
+  }
+};
+
+// Image Validation for listing photos
+export interface ImageValidationResponse {
+  overallStatus: 'approved' | 'warning' | 'rejected';
+  results: {
+    index: number;
+    status: 'approved' | 'warning' | 'rejected';
+    qualityScore: number;
+    relevanceScore: number;
+    issues: string[];
+    suggestions?: string[];
+    rejectionReason?: string;
+    itemDescription?: string;
+  }[];
+  message: string;
+}
+
+export const validateListingImages = async (
+  images: { base64: string; mimeType: string }[],
+  category?: string
+): Promise<ImageValidationResponse | null> => {
+  if (images.length === 0) return null;
+
+  try {
+    return await callGeminiAPI<ImageValidationResponse>('validateImages', { images, category });
+  } catch (error) {
+    console.error("Image validation failed:", error);
+    // Return permissive result on error (don't block uploads)
+    return {
+      overallStatus: 'warning',
+      results: images.map((_, index) => ({
+        index,
+        status: 'warning' as const,
+        qualityScore: 50,
+        relevanceScore: 50,
+        issues: ['Automated check unavailable'],
+        suggestions: []
+      })),
+      message: 'Automated check unavailable. Please ensure your photos are clear.'
+    };
+  }
+};
+
 const getDefaultChecklist = (category: string): string[] => {
   switch (category) {
     case Category.STROLLERS:

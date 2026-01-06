@@ -1,13 +1,14 @@
 
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
-import { UserCheck, MapPin, Calendar, Package, Trash2, CheckCircle, LogOut, Pencil, Heart, ChevronRight, Crown, BarChart2, Settings, Bell, ShoppingBag, Eye, DollarSign, Clock, Search, AlertCircle, ArrowRight, Gift, Share2, Copy, Users, Tag } from 'lucide-react';
+import { UserCheck, MapPin, Calendar, Package, Trash2, CheckCircle, LogOut, Pencil, Heart, ChevronRight, Crown, BarChart2, Settings, Bell, ShoppingBag, Eye, DollarSign, Clock, Search, AlertCircle, ArrowRight, Gift, Share2, Copy, Users, Tag, ShieldCheck, CalendarClock } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import ListingCard from '../components/ListingCard';
 import StripeOnboarding from '../components/StripeOnboarding';
 import OfferCard from '../components/OfferCard';
 import { useToast } from '../context/ToastContext';
-import { TransactionStatus, OfferStatus } from '../types';
+import { TransactionStatus, OfferStatus, TrustTier } from '../types';
+import TrustBadge, { TrustProfileBadge } from '../components/TrustBadge';
 
 const Profile = () => {
   const { currentUser, listings, transactions, markAsSold, deleteListing, deleteSavedSearch, logout, offers } = useStore();
@@ -91,7 +92,7 @@ const Profile = () => {
         <div className="flex justify-between items-start mb-6">
           <h1 className="font-bold font-serif text-3xl text-[#4A3F37]">Profile</h1>
           <div className="flex gap-2">
-            <Link to="/settings/dev" className="p-2 rounded-full transition-colors bg-[#FFFCF9] text-[#4A3F37] hover:bg-[#E8DDD4]" title="Developer Settings">
+            <Link to="/profile/account" className="p-2 rounded-full transition-colors bg-[#FFFCF9] text-[#4A3F37] hover:bg-[#E8DDD4]" title="Account Settings">
               <Settings className="w-4 h-4" />
             </Link>
             <button onClick={logout} className="p-2 rounded-full transition-colors flex items-center gap-1 bg-[#FFFCF9] text-[#4A3F37] hover:bg-red-50 hover:text-red-500">
@@ -105,15 +106,20 @@ const Profile = () => {
             <div className="rounded-full p-1 bg-[#2D9B8C]">
                <img src={currentUser.avatarUrl} alt="Profile" className="w-20 h-20 rounded-full object-cover shadow-md bg-[#E8DDD4] border-2 border-white" />
             </div>
-            {currentUser.isVerifiedParent && (
+            {(currentUser.trustTier === TrustTier.TRUSTED || currentUser.trustTier === TrustTier.VERIFIED) && (
               <div className="absolute -bottom-1 -right-1 bg-[#2D9B8C] p-1.5 rounded-full border-2 border-white">
-                <UserCheck className="w-3 h-3 text-white" />
+                {currentUser.trustTier === TrustTier.TRUSTED ? (
+                  <ShieldCheck className="w-3 h-3 text-white" />
+                ) : (
+                  <UserCheck className="w-3 h-3 text-white" />
+                )}
               </div>
             )}
           </div>
           <div className="flex-1">
             <div className="flex items-center gap-2">
                <h2 className="font-bold font-serif text-2xl text-[#4A3F37]">{currentUser.name}</h2>
+               <TrustBadge tier={currentUser.trustTier || TrustTier.BASIC} size="md" />
                {currentUser.isPremium && <Crown className="w-5 h-5 text-yellow-500 fill-current animate-in zoom-in" />}
             </div>
             <div className="flex items-center gap-1 text-sm mt-1 text-[#9A8578]"><MapPin className="w-3 h-3" />{currentUser.location}</div>
@@ -123,6 +129,44 @@ const Profile = () => {
             <Pencil className="w-5 h-5" />
           </button>
         </div>
+
+        {/* Trust & Verification Card */}
+        <Link to="/profile/trust" className="block rounded-xl p-4 mb-4 bg-[#F0FAF8] border border-[#2D9B8C]/20 hover:border-[#2D9B8C]/40 transition-colors group">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-full bg-[#2D9B8C]/20">
+              <ShieldCheck className="w-5 h-5 text-[#2D9B8C]" />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-bold text-sm text-[#4A3F37]">Trust & Verification</h3>
+              <p className="text-xs text-[#6B5D52]">
+                {currentUser.trustTier === TrustTier.TRUSTED
+                  ? 'You have Trusted Parent status'
+                  : currentUser.trustTier === TrustTier.VERIFIED
+                    ? 'Verify your ID to become a Trusted Parent'
+                    : 'Complete verification to unlock features'}
+              </p>
+            </div>
+            <ChevronRight className="w-5 h-5 text-[#9A8578] group-hover:translate-x-1 transition-transform" />
+          </div>
+        </Link>
+
+        {/* Availability & Scheduling Card */}
+        <Link to="/profile/availability" className="block rounded-xl p-4 mb-4 bg-gradient-to-r from-[#E8F5F3] to-[#FEF9E7] border border-[#2D9B8C]/20 hover:border-[#2D9B8C]/40 transition-colors group">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-full bg-[#2D9B8C]/20">
+              <CalendarClock className="w-5 h-5 text-[#2D9B8C]" />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-bold text-sm text-[#4A3F37]">Availability & Meetups 📅</h3>
+              <p className="text-xs text-[#6B5D52]">
+                {currentUser.availabilityEnabled
+                  ? 'Smart scheduling enabled'
+                  : 'Set up smart scheduling for faster exchanges'}
+              </p>
+            </div>
+            <ChevronRight className="w-5 h-5 text-[#9A8578] group-hover:translate-x-1 transition-transform" />
+          </div>
+        </Link>
 
         <Link to="/profile/premium" className={`block rounded-xl p-4 mb-4 flex items-center gap-3 transition-all relative overflow-hidden group ${currentUser.isPremium ? 'bg-gray-900 text-white' : 'bg-gradient-to-r from-gray-900 to-gray-800 text-white shadow-lg'}`}>
           <div className={`p-2 rounded-full ${currentUser.isPremium ? 'bg-white/10' : 'bg-yellow-400/20'}`}><Crown className={`w-5 h-5 ${currentUser.isPremium ? 'text-yellow-400' : 'text-yellow-400'}`} /></div>
@@ -215,7 +259,9 @@ const Profile = () => {
                     <h3 className="font-bold text-sm flex items-center gap-2 text-[#4A3F37]">
                        <BarChart2 className="w-4 h-4 text-[#2D9B8C]" /> Seller Dashboard
                     </h3>
-                    <span className="text-xs px-2 py-1 rounded font-medium bg-white text-[#4A3F37]">Last 30 Days</span>
+                    <Link to="/profile/analytics" className="text-xs px-3 py-1.5 rounded-full font-medium bg-[#2D9B8C] text-white hover:bg-[#247A6F] transition-colors flex items-center gap-1">
+                       View Analytics <ChevronRight className="w-3 h-3" />
+                    </Link>
                  </div>
 
                  <div className="flex gap-4">
@@ -308,6 +354,18 @@ const Profile = () => {
           </div>
         )}
 
+        {/* Quick Action Buttons for Sellers */}
+        {activeTab === 'selling' && myListings.length > 0 && (
+          <div className="flex gap-2 mb-4 animate-in fade-in duration-300">
+            <Link
+              to="/profile/inventory"
+              className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-[#F5EDE6] rounded-xl text-sm font-medium text-[#4A3F37] hover:bg-[#E8DDD4] transition-colors"
+            >
+              <Package className="w-4 h-4" /> Manage Inventory
+            </Link>
+          </div>
+        )}
+
         {activeTab === 'selling' && (
           <div className="space-y-3 animate-in fade-in duration-300">
              {myListings.length > 0 ? myListings.map(listing => (
@@ -333,15 +391,13 @@ const Profile = () => {
                </div>
              )) : (
                <div className="text-center py-12 rounded-2xl border border-dashed border-[#E8DDD4] bg-[#FFFCF9]">
-                 <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-[#F5EDE6] flex items-center justify-center">
-                   <Package className="w-8 h-8 text-[#B8A395]" />
-                 </div>
+                 <div className="text-4xl mb-4">📦</div>
                  <h3 className="font-serif text-lg font-semibold text-[#4A3F37] mb-1">No listings yet</h3>
                  <p className="text-[#9A8578] text-sm mb-4 max-w-xs mx-auto">
                    Turn your baby gear into cash! List items your little one has outgrown.
                  </p>
                  <Link to="/sell" className="inline-flex items-center gap-2 bg-[#2D9B8C] text-white font-semibold px-5 py-2.5 rounded-full hover:bg-[#247A6F] transition-colors">
-                   <Package className="w-4 h-4" /> List Your First Item
+                   ✨ List Your First Item
                  </Link>
                </div>
              )}
@@ -350,21 +406,36 @@ const Profile = () => {
 
         {activeTab === 'saved' && (
            <div className="animate-in fade-in duration-300">
+              {/* Wishlist Link */}
+              <Link
+                to="/profile/wishlist"
+                className="flex items-center justify-between p-3 mb-4 bg-gradient-to-r from-[#2D9B8C]/10 to-[#E8B44C]/10 rounded-xl border border-[#E8DDD4] hover:border-[#2D9B8C]/30 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-[#2D9B8C]/20 flex items-center justify-center">
+                    <Bell className="w-5 h-5 text-[#2D9B8C]" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-[#4A3F37] text-sm">Price Drop Alerts</p>
+                    <p className="text-xs text-[#B8A395]">Get notified when prices drop</p>
+                  </div>
+                </div>
+                <ChevronRight className="w-5 h-5 text-[#B8A395]" />
+              </Link>
+
               {savedListings.length > 0 ? (
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 lg:gap-6">
                   {savedListings.map(listing => <ListingCard key={listing.id} listing={listing} />)}
                 </div>
               ) : (
                 <div className="text-center py-12 rounded-2xl border border-dashed border-[#E8DDD4] bg-[#FFFCF9]">
-                  <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-[#F5EDE6] flex items-center justify-center">
-                    <Heart className="w-8 h-8 text-[#B8A395]" />
-                  </div>
+                  <div className="text-4xl mb-4">💛</div>
                   <h3 className="font-serif text-lg font-semibold text-[#4A3F37] mb-1">No saved items</h3>
                   <p className="text-[#9A8578] text-sm mb-4 max-w-xs mx-auto">
                     Tap the heart on any listing to save it here for later.
                   </p>
                   <Link to="/" className="inline-flex items-center gap-2 bg-[#2D9B8C] text-white font-semibold px-5 py-2.5 rounded-full hover:bg-[#247A6F] transition-colors">
-                    <Search className="w-4 h-4" /> Browse Items
+                    Browse Items
                   </Link>
                 </div>
               )}
@@ -401,15 +472,13 @@ const Profile = () => {
               );
             }) : (
               <div className="text-center py-12 rounded-2xl border border-dashed border-[#E8DDD4] bg-[#FFFCF9]">
-                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-[#F5EDE6] flex items-center justify-center">
-                  <ShoppingBag className="w-8 h-8 text-[#B8A395]" />
-                </div>
+                <div className="text-4xl mb-4">🛍️</div>
                 <h3 className="font-serif text-lg font-semibold text-[#4A3F37] mb-1">No orders yet</h3>
                 <p className="text-[#9A8578] text-sm mb-4 max-w-xs mx-auto">
                   When you buy something, your orders will appear here.
                 </p>
                 <Link to="/" className="inline-flex items-center gap-2 bg-[#2D9B8C] text-white font-semibold px-5 py-2.5 rounded-full hover:bg-[#247A6F] transition-colors">
-                  <Search className="w-4 h-4" /> Start Shopping
+                  Start Shopping
                 </Link>
               </div>
             )}
@@ -472,15 +541,13 @@ const Profile = () => {
               );
             }) : (
               <div className="text-center py-12 rounded-2xl border border-dashed border-[#E8DDD4] bg-[#FFFCF9]">
-                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-[#F5EDE6] flex items-center justify-center">
-                  <Bell className="w-8 h-8 text-[#B8A395]" />
-                </div>
+                <div className="text-4xl mb-4">🔔</div>
                 <h3 className="font-serif text-lg font-semibold text-[#4A3F37] mb-1">No saved searches</h3>
                 <p className="text-[#9A8578] text-sm mb-4 max-w-xs mx-auto">
                   Save a search from the home page to get notified when new items match your criteria.
                 </p>
                 <Link to="/" className="inline-flex items-center gap-2 bg-[#2D9B8C] text-white font-semibold px-5 py-2.5 rounded-full hover:bg-[#247A6F] transition-colors">
-                  <Search className="w-4 h-4" /> Search Items
+                  Search Items
                 </Link>
               </div>
             )}

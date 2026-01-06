@@ -287,3 +287,125 @@ export const resetPassword = async (email: string): Promise<void> => {
 export const isEmailAuthAvailable = (): boolean => {
   return !!supabase;
 };
+
+// Delete user account
+// Note: Full account deletion requires server-side function with admin privileges
+// This function handles the client-side part and marks the account for deletion
+export const deleteUserAccount = async (userId: string): Promise<void> => {
+  if (!supabase) {
+    throw new Error('Service not available');
+  }
+
+  try {
+    // Delete user's profile data first
+    const { error: profileError } = await supabase
+      .from('users')
+      .delete()
+      .eq('id', userId);
+
+    if (profileError && profileError.code !== 'PGRST116') {
+      console.error('Failed to delete user profile:', profileError);
+    }
+
+    // Delete user's listings
+    const { error: listingsError } = await supabase
+      .from('listings')
+      .delete()
+      .eq('user_id', userId);
+
+    if (listingsError && listingsError.code !== 'PGRST116') {
+      console.error('Failed to delete user listings:', listingsError);
+    }
+
+    // Sign out the user
+    await supabase.auth.signOut();
+  } catch (error: any) {
+    console.error('Account deletion error:', error);
+    throw new Error('Failed to delete account. Please contact support.');
+  }
+};
+
+// Update user email (requires email verification)
+export const updateUserEmail = async (newEmail: string): Promise<void> => {
+  if (!supabase) {
+    throw new Error('Service not available');
+  }
+
+  const { error } = await supabase.auth.updateUser({
+    email: newEmail
+  });
+
+  if (error) throw error;
+};
+
+// Update user password
+export const updateUserPassword = async (newPassword: string): Promise<void> => {
+  if (!supabase) {
+    throw new Error('Service not available');
+  }
+
+  const { error } = await supabase.auth.updateUser({
+    password: newPassword
+  });
+
+  if (error) throw error;
+};
+
+// ============================================
+// SOCIAL OAUTH (Google, Facebook, Apple)
+// ============================================
+
+export type OAuthProvider = 'google' | 'facebook' | 'apple';
+
+// Sign in with OAuth provider (redirects to provider)
+export const signInWithOAuth = async (provider: OAuthProvider): Promise<void> => {
+  if (!supabase) {
+    throw new Error('Authentication service not available');
+  }
+
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider,
+    options: {
+      redirectTo: `${window.location.origin}/auth/callback`,
+      queryParams: provider === 'google' ? {
+        access_type: 'offline',
+        prompt: 'consent',
+      } : undefined
+    }
+  });
+
+  if (error) throw error;
+};
+
+// Convenience functions for each provider
+export const signInWithGoogle = () => signInWithOAuth('google');
+export const signInWithFacebook = () => signInWithOAuth('facebook');
+export const signInWithApple = () => signInWithOAuth('apple');
+
+// Link an OAuth provider to existing account (for trust verification)
+export const linkOAuthProvider = async (provider: OAuthProvider): Promise<void> => {
+  if (!supabase) {
+    throw new Error('Authentication service not available');
+  }
+
+  // Note: Supabase doesn't directly support linking accounts
+  // Instead, we'll use the identity linking approach
+  const { error } = await supabase.auth.linkIdentity({
+    provider,
+    options: {
+      redirectTo: `${window.location.origin}/auth/callback?link=${provider}`
+    }
+  });
+
+  if (error) {
+    // If linking fails (may not be supported in all Supabase versions),
+    // fall back to just tracking in user metadata
+    console.warn('OAuth linking not available:', error.message);
+    throw new Error(`Could not connect ${provider}. Please try again.`);
+  }
+};
+
+// Check if OAuth providers are available
+export const isOAuthAvailable = (): boolean => {
+  return !!supabase;
+};

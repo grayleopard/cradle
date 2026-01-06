@@ -2,21 +2,17 @@
 {
   "name": "Pipit",
   "short_name": "Pipit",
-  "start_url": ".",
+  "start_url": "/",
   "display": "standalone",
   "background_color": "#FFFCF9",
   "theme_color": "#2D9B8C",
-  "description": "Safe, curated marketplace for baby & kids gear.",
+  "description": "The safest way to buy and sell pre-loved baby gear.",
   "icons": [
     {
-      "src": "https://api.dicebear.com/7.x/initials/svg?seed=P&backgroundColor=2D9B8C",
-      "sizes": "192x192",
-      "type": "image/svg+xml"
-    },
-    {
-      "src": "https://api.dicebear.com/7.x/initials/svg?seed=P&backgroundColor=2D9B8C",
-      "sizes": "512x512",
-      "type": "image/svg+xml"
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
     }
   ]
 }

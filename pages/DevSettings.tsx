@@ -142,7 +142,7 @@ const DevSettings = () => {
                      name="VITE_CLOUDINARY_UPLOAD_PRESET"
                      value={keys.VITE_CLOUDINARY_UPLOAD_PRESET}
                      onChange={handleChange}
-                     placeholder="e.g. cradle_uploads"
+                     placeholder="e.g. pipit_uploads"
                      className="w-full p-3 bg-gray-50 rounded-lg text-sm font-mono border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#2D9B8C]"
                    />
                 </div>

@@ -3,11 +3,12 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useStore } from '../context/StoreContext';
 import { useToast } from '../context/ToastContext';
-import { TransactionStatus, Review } from '../types';
-import { ChevronLeft, Lock, ShieldCheck, CheckCircle, MapPin, Clock, CreditCard, Camera, AlertTriangle, UserCheck, Sparkles, ExternalLink, X, RotateCcw, Loader2, FileText, Star, Download, XCircle, UserPlus, Users, Baby, Banknote } from 'lucide-react';
+import { TransactionStatus, Review, ExchangeType, SafeMeetupLocation } from '../types';
+import { ChevronLeft, Lock, ShieldCheck, CheckCircle, MapPin, Clock, CreditCard, Camera, AlertTriangle, UserCheck, Sparkles, ExternalLink, X, RotateCcw, Loader2, FileText, Star, Download, XCircle, UserPlus, Users, Baby, Banknote, CalendarClock } from 'lucide-react';
 import SafetyBadge from '../components/SafetyBadge';
 import StripePaymentForm from '../components/StripePaymentForm';
 import StripeOnboarding from '../components/StripeOnboarding';
+import SchedulePicker from '../components/SchedulePicker';
 import { generateInspectionChecklist } from '../services/geminiService';
 import { capturePayment, cancelPayment, transferToSeller } from '../services/stripeService';
 import { processImage } from '../utils/fileHelpers';
@@ -37,6 +38,10 @@ const Transaction = () => {
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
   const [reviewSubmitted, setReviewSubmitted] = useState(false);
+  const [reviewPhotoPreview, setReviewPhotoPreview] = useState<string | null>(null);
+  const [reviewPhotoBlob, setReviewPhotoBlob] = useState<Blob | null>(null);
+  const [uploadingReviewPhoto, setUploadingReviewPhoto] = useState(false);
+  const reviewPhotoInputRef = useRef<HTMLInputElement>(null);
 
   // Follow Connection State
   const [hasFollowed, setHasFollowed] = useState(false);
@@ -47,6 +52,9 @@ const Transaction = () => {
   // Seller Payout State
   const [transferring, setTransferring] = useState(false);
   const [payoutComplete, setPayoutComplete] = useState(false);
+
+  // Smart Scheduling State
+  const [showSchedulePicker, setShowSchedulePicker] = useState(false);
 
   const transaction = getTransactionById(id || '');
   if (!transaction) return <div className="p-4">Transaction not found</div>;
@@ -77,6 +85,37 @@ const Transaction = () => {
       setTimeout(() => setShowConfetti(false), 5000);
     }
   }, [transaction.status]);
+
+  // Auto-release funds after 24 hours if no dispute
+  useEffect(() => {
+    const checkAutoRelease = async () => {
+      // Only auto-release if in INSPECTION_PENDING status
+      if (transaction.status !== TransactionStatus.INSPECTION_PENDING) return;
+
+      // Calculate time since inspection started (use meetup time or payment captured time)
+      const inspectionStartTime = transaction.meetupTime
+        ? new Date(transaction.meetupTime).getTime()
+        : transaction.paidAt
+          ? new Date(transaction.paidAt).getTime()
+          : null;
+
+      if (!inspectionStartTime) return;
+
+      const hoursSinceStart = (Date.now() - inspectionStartTime) / (1000 * 60 * 60);
+
+      // Auto-complete after 24 hours
+      if (hoursSinceStart >= 24) {
+        console.log('[Auto-Release] 24 hours passed, auto-completing transaction');
+        showToast('Transaction auto-completed after 24 hours', 'success');
+        updateTransactionStatus(transaction.id, TransactionStatus.COMPLETED, {
+          completedAt: new Date().toISOString(),
+          autoReleased: true
+        });
+      }
+    };
+
+    checkAutoRelease();
+  }, [transaction.id, transaction.status, transaction.meetupTime]);
 
   // Fetch smart checklist when entering inspection mode
   useEffect(() => {
@@ -115,11 +154,39 @@ const Transaction = () => {
   };
 
   const handleConfirmMeetup = () => {
-    updateTransactionStatus(transaction.id, TransactionStatus.MEETUP_AGREED, {
-      meetupLocation: "Auburn Police Station (Safe Zone)",
-      meetupTime: "Tomorrow at 2:00 PM"
-    });
-    showToast("Meetup confirmed!");
+    // Show smart scheduling picker instead of hardcoded meetup
+    setShowSchedulePicker(true);
+  };
+
+  const handleScheduleConfirmed = (schedule: {
+    exchangeType: ExchangeType;
+    date?: string;
+    timeSlot?: string;
+    location?: SafeMeetupLocation;
+    porchAddress?: string;
+  }) => {
+    setShowSchedulePicker(false);
+
+    if (schedule.exchangeType === ExchangeType.PORCH_PICKUP) {
+      updateTransactionStatus(transaction.id, TransactionStatus.SCHEDULED, {
+        exchangeType: ExchangeType.PORCH_PICKUP,
+        meetupLocation: schedule.porchAddress || 'Seller porch',
+        meetupTime: 'Porch pickup - pick up within 24h'
+      });
+      showToast("Porch pickup scheduled! 🏠");
+    } else if (schedule.exchangeType === ExchangeType.IN_PERSON && schedule.location) {
+      updateTransactionStatus(transaction.id, TransactionStatus.SCHEDULED, {
+        exchangeType: ExchangeType.IN_PERSON,
+        scheduledDate: schedule.date,
+        scheduledTimeSlot: schedule.timeSlot,
+        scheduledLocationId: schedule.location.id,
+        scheduledLocationName: schedule.location.name,
+        scheduledLocationAddress: `${schedule.location.address}, ${schedule.location.city}`,
+        meetupLocation: schedule.location.name,
+        meetupTime: schedule.timeSlot
+      });
+      showToast("Meetup scheduled! 📅");
+    }
   };
 
   const handleArrived = () => {
@@ -207,22 +274,53 @@ const Transaction = () => {
     }
   };
 
-  const handleSubmitReview = () => {
+  const handleReviewPhotoCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      try {
+        const processed = await processImage(e.target.files[0]);
+        setReviewPhotoPreview(processed.previewUrl);
+        setReviewPhotoBlob(processed.blob);
+      } catch (err) {
+        showToast("Failed to process photo", "error");
+      }
+    }
+  };
+
+  const handleSubmitReview = async () => {
     if(!currentUser || !otherUser) return;
 
-    const newReview: Review = {
+    setUploadingReviewPhoto(true);
+
+    try {
+      // Upload review photo if provided
+      let photoUrl: string | undefined;
+      if (reviewPhotoBlob) {
+        photoUrl = await uploadToCloudinary(reviewPhotoBlob);
+      }
+
+      const newReview: Review = {
         id: `rev_${Date.now()}`,
         targetUserId: otherUser.id,
         authorId: currentUser.id,
         authorName: currentUser.name,
+        authorAvatarUrl: currentUser.avatarUrl,
         rating,
         comment,
-        date: new Date().toISOString().split('T')[0]
-    };
+        date: new Date().toISOString().split('T')[0],
+        photoUrl,
+        transactionId: transaction.id,
+        itemTitle: listing.title
+      };
 
-    addReview(newReview);
-    setReviewSubmitted(true);
-    showToast("Review submitted successfully!", "success");
+      addReview(newReview);
+      setReviewSubmitted(true);
+      showToast("Review submitted successfully!", "success");
+    } catch (error) {
+      console.error('Failed to submit review:', error);
+      showToast("Failed to submit review", "error");
+    } finally {
+      setUploadingReviewPhoto(false);
+    }
   };
 
   const handleFollowUser = () => {
@@ -402,29 +500,50 @@ const Transaction = () => {
           {/* Step 3: Meetup */}
           <div className={`relative ${[TransactionStatus.INITIATED, TransactionStatus.ACCEPTED].includes(transaction.status) ? 'opacity-40' : ''}`}>
              <div className={`absolute -left-[21px] w-4 h-4 rounded-full border-2 ${[TransactionStatus.INITIATED, TransactionStatus.ACCEPTED, TransactionStatus.PAYMENT_HELD].includes(transaction.status) ? 'bg-white border-gray-300' : 'bg-green-500 border-green-500'}`}></div>
-             <h4 className="font-bold text-sm text-[#4A3F37]">Meetup & Inspection</h4>
-             
+             <h4 className="font-bold text-sm text-[#4A3F37]">Schedule Exchange</h4>
+
              {transaction.status === TransactionStatus.PAYMENT_HELD && (
                <div className="mt-3">
-                 <p className="text-xs text-[#9A8578] mb-3">Coordinate a time and place in chat, then confirm here.</p>
-                 <button onClick={handleConfirmMeetup} className="bg-[#E8DDD4] text-gray-800 px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2">
-                   <Clock className="w-3 h-3" /> Confirm Meeting Details
+                 <p className="text-xs text-[#9A8578] mb-3">Choose when and where to meet</p>
+                 <button
+                   onClick={handleConfirmMeetup}
+                   className="bg-[#2D9B8C] text-white px-4 py-3 rounded-xl text-sm font-bold flex items-center gap-2 w-full justify-center hover:bg-[#247A6F] transition-colors"
+                 >
+                   <CalendarClock className="w-4 h-4" /> Schedule Exchange 📅
                  </button>
                </div>
              )}
 
-             {transaction.status === TransactionStatus.MEETUP_AGREED && (
-                <div className="mt-3 bg-blue-50 p-3 rounded-lg border border-blue-100">
-                   <div className="flex items-center gap-2 text-sm font-medium text-blue-900 mb-1">
-                     <MapPin className="w-4 h-4" /> Auburn Police Station
+             {/* Smart Scheduled Meetup */}
+             {(transaction.status === TransactionStatus.SCHEDULED || transaction.status === TransactionStatus.MEETUP_AGREED) && (
+                <div className="mt-3 bg-gradient-to-br from-[#E8F5F3] to-[#D4EDE9] p-4 rounded-xl border border-[#2D9B8C]/20">
+                   <div className="flex items-center gap-2 text-sm font-medium text-[#247A6F] mb-2">
+                     {transaction.exchangeType === ExchangeType.PORCH_PICKUP ? (
+                       <span className="text-lg">🏠</span>
+                     ) : (
+                       <MapPin className="w-4 h-4" />
+                     )}
+                     {transaction.scheduledLocationName || transaction.meetupLocation}
                    </div>
-                   <div className="text-xs text-blue-700 mb-3">Tomorrow at 2:00 PM</div>
-                   <div className="bg-white p-2 rounded mb-3 text-xs text-[#6B5D52] border border-blue-100 flex gap-2 items-start">
+                   <div className="text-xs text-[#4A3F37] mb-3">
+                     {transaction.scheduledTimeSlot || transaction.meetupTime}
+                   </div>
+                   {transaction.scheduledLocationAddress && (
+                     <div className="text-xs text-[#6B5D52] mb-3">
+                       📍 {transaction.scheduledLocationAddress}
+                     </div>
+                   )}
+                   <div className="bg-white p-2 rounded-lg mb-3 text-xs text-[#6B5D52] border border-[#2D9B8C]/10 flex gap-2 items-start">
                       <Sparkles className="w-3 h-3 text-[#2D9B8C] flex-shrink-0 mt-0.5" />
-                      We will generate a custom safety checklist for this item when you arrive.
+                      {transaction.exchangeType === ExchangeType.PORCH_PICKUP
+                        ? "Pick up from the porch and take a photo to confirm receipt."
+                        : "We'll generate a custom safety checklist for this item when you arrive."}
                    </div>
-                   <button onClick={handleArrived} className="w-full bg-blue-600 text-white py-2 rounded-lg text-sm font-bold">
-                     I Have Arrived
+                   <button
+                     onClick={handleArrived}
+                     className="w-full bg-[#2D9B8C] text-white py-3 rounded-xl text-sm font-bold hover:bg-[#247A6F] transition-colors"
+                   >
+                     {transaction.exchangeType === ExchangeType.PORCH_PICKUP ? "I've Picked Up the Item" : "I Have Arrived"}
                    </button>
                 </div>
              )}
@@ -660,19 +779,59 @@ const Transaction = () => {
                             </div>
 
                             {rating > 0 && (
-                               <div className="animate-in fade-in slide-in-from-bottom-2">
+                               <div className="animate-in fade-in slide-in-from-bottom-2 space-y-3">
                                   <textarea
                                     value={comment}
                                     onChange={(e) => setComment(e.target.value)}
                                     placeholder={isBuyer ? "How was the item and meetup experience?" : "How was the buyer to work with?"}
-                                    className="w-full p-3 bg-[#F5EDE6] border border-[#E8DDD4] rounded-lg text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                                    className="w-full p-3 bg-[#F5EDE6] border border-[#E8DDD4] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400"
                                     rows={2}
                                   />
+
+                                  {/* Photo Review Section */}
+                                  <div className="border border-dashed border-[#E8DDD4] rounded-lg p-3">
+                                    {reviewPhotoPreview ? (
+                                      <div className="relative">
+                                        <img
+                                          src={reviewPhotoPreview}
+                                          alt="Review photo"
+                                          className="w-full h-32 object-cover rounded-lg"
+                                        />
+                                        <button
+                                          onClick={() => { setReviewPhotoPreview(null); setReviewPhotoBlob(null); }}
+                                          className="absolute top-2 right-2 bg-black/60 text-white p-1 rounded-full hover:bg-red-500"
+                                        >
+                                          <X className="w-4 h-4" />
+                                        </button>
+                                      </div>
+                                    ) : (
+                                      <button
+                                        onClick={() => reviewPhotoInputRef.current?.click()}
+                                        className="w-full flex items-center justify-center gap-2 py-2 text-[#6B5D52] hover:text-[#4A3F37] transition-colors"
+                                      >
+                                        <Camera className="w-4 h-4" />
+                                        <span className="text-sm">Add a photo (optional)</span>
+                                      </button>
+                                    )}
+                                    <input
+                                      type="file"
+                                      ref={reviewPhotoInputRef}
+                                      onChange={handleReviewPhotoCapture}
+                                      accept="image/*"
+                                      className="hidden"
+                                    />
+                                  </div>
+
                                   <button
                                     onClick={handleSubmitReview}
-                                    className="w-full py-2 bg-black text-white rounded-lg text-sm font-bold"
+                                    disabled={uploadingReviewPhoto}
+                                    className="w-full py-2 bg-black text-white rounded-lg text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-2"
                                   >
-                                    Submit Review
+                                    {uploadingReviewPhoto ? (
+                                      <><Loader2 className="w-4 h-4 animate-spin" /> Uploading...</>
+                                    ) : (
+                                      'Submit Review'
+                                    )}
                                   </button>
                                </div>
                             )}
@@ -791,7 +950,7 @@ const Transaction = () => {
                  </h3>
                  <button onClick={() => setShowRejectModal(false)} className="p-1 hover:bg-[#E8DDD4] rounded-full"><X className="w-5 h-5 text-[#9A8578]" /></button>
               </div>
-              
+
               <div className="space-y-4">
                  <p className="text-sm text-[#6B5D52]">Why are you declining this item? Your payment will be refunded.</p>
                  <div className="space-y-2">
@@ -805,8 +964,8 @@ const Transaction = () => {
                        </button>
                     ))}
                  </div>
-                 
-                 <button 
+
+                 <button
                    onClick={handleRejectTransaction}
                    disabled={!rejectReason}
                    className="w-full py-3 bg-red-600 text-white font-bold rounded-xl shadow-lg hover:bg-red-700 disabled:opacity-50 transition-colors"
@@ -815,6 +974,23 @@ const Transaction = () => {
                  </button>
               </div>
            </div>
+        </div>
+      )}
+
+      {/* Schedule Picker Modal */}
+      {showSchedulePicker && (
+        <div className="absolute inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center p-4 animate-in fade-in">
+          <div className="w-full max-w-md animate-in slide-in-from-bottom-10 max-h-[90vh] overflow-y-auto">
+            <SchedulePicker
+              buyerId={transaction.buyerId}
+              sellerId={transaction.sellerId}
+              buyerZip={currentUser?.location || '98002'}
+              sellerZip={seller?.location || listing.locationZip}
+              sellerPorchEnabled={seller?.porchPickupEnabled}
+              onScheduleConfirmed={handleScheduleConfirmed}
+              onCancel={() => setShowSchedulePicker(false)}
+            />
+          </div>
         </div>
       )}
     </div>
